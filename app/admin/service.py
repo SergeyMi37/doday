@@ -238,16 +238,27 @@ async def count_unverified(session: AsyncSession, *, older_than_days: int = 0) -
 
 
 async def purge_unverified(session: AsyncSession, *, older_than_days: int = 3) -> int:
-    """Удаляет НЕподтверждённые аккаунты старше N дней. Возвращает число удалённых.
+    """Удаляет брошенные неподтверждённые аккаунты старше N дней.
 
-    Никогда не трогает подтверждённых и админов. Неподтверждённый войти не может
-    (логин требует verified), поэтому у него нет задач/данных — каскад безопасен.
+    Прежний докстринг утверждал, что неподтверждённый войти не может, — это
+    неправда: подтверждение почты «мягкое» (см. authenticate), человек входит
+    и пользуется сервисом, даже если письмо не дошло. Удаление каскадом
+    стирало бы его задачи. Поэтому удаляем только тех, у кого нет ни одной
+    задачи, привязки к Telegram и профиля репетитора — ровно те же условия,
+    что у автоочистки при старте.
     """
+    from app.lessio.models import LessioTutorProfile
+    from app.tasks.models import Task
+    from app.telegram.models import TelegramLink
+
     cutoff = datetime.now(UTC) - timedelta(days=max(0, older_than_days))
     stmt = delete(User).where(
         User.email_verified_at.is_(None),
         User.is_admin.is_(False),
         User.created_at < cutoff,
+        ~select(Task.id).where(Task.user_id == User.id).exists(),
+        ~select(TelegramLink.id).where(TelegramLink.user_id == User.id).exists(),
+        ~select(LessioTutorProfile.id).where(LessioTutorProfile.user_id == User.id).exists(),
     )
     result = await session.execute(stmt)
     await session.commit()
