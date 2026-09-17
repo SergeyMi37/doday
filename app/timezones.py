@@ -122,15 +122,20 @@ def today_in(name: str | None) -> date:
     return now_in(name).date()
 
 
-def local_date_of(moment: datetime, name: str | None) -> date:
-    """В какой локальный день попадает момент времени.
+def as_utc(moment: datetime) -> datetime:
+    """Момент в UTC. Наивное значение считаем уже UTC, а не местным временем.
 
-    Наивный datetime считаем UTC: в базе всё хранится в UTC, но драйвер в
-    отдельных местах отдаёт значения без пояса.
+    В базе всё лежит в UTC, но кое-где значение приходит без пояса. Если
+    отдать такое в `astimezone`, питон решит, что это время по часам сервера,
+    и молча сдвинет момент на смещение машины — ошибка, которая проявится
+    только на сервере с ненулевым поясом.
     """
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(zone_of(name)).date()
+    return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment.astimezone(UTC)
+
+
+def local_date_of(moment: datetime, name: str | None) -> date:
+    """В какой локальный день попадает момент времени."""
+    return as_utc(moment).astimezone(zone_of(name)).date()
 
 
 def day_bounds(name: str | None, day: date | None = None) -> tuple[datetime, datetime]:
@@ -203,7 +208,7 @@ def due_day(due: datetime, *, date_only: bool, tz: str | None) -> date:
     просроченных) спрашивает день здесь.
     """
     if date_only:
-        return due.astimezone(UTC).date()
+        return as_utc(due).date()
     return local_date_of(due, tz)
 
 
