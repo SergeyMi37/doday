@@ -3,14 +3,22 @@
 Пока ключи не заданы в .env — капча выключена и verify() всегда пропускает,
 чтобы регистрация работала как раньше. Fail-open: если сервис reCAPTCHA
 недоступен (сеть/таймаут/5xx), тоже пропускаем — иначе временный сбой Google
-заблокировал бы всем регистрацию. Ботов в этот момент подстрахует honeypot.
+заблокировал бы всем регистрацию. Ботов в этот момент подстрахуют остальные
+проверки из app.auth.antibot.
+
+Домен — www.recaptcha.net, а не www.google.com. Это официальный запасной адрес
+Google для тех, у кого google.com недоступен: API и ключи те же. Для нашей
+аудитории это важно — у кого не загрузится виджет, тот не зарегистрируется.
 """
 
 import httpx
 
 from app.config import get_settings
 
-VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
+RECAPTCHA_HOST = "https://www.recaptcha.net"
+VERIFY_URL = f"{RECAPTCHA_HOST}/recaptcha/api/siteverify"
+# hl=ru — подписи виджета по-русски, как и весь сайт.
+SCRIPT_URL = f"{RECAPTCHA_HOST}/recaptcha/api.js?hl=ru"
 
 
 def is_enabled() -> bool:

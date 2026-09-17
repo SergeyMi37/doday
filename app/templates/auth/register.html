@@ -157,11 +157,12 @@
             <span>Согласен с <a href="/privacy" class="text-[var(--accent)] hover:underline">политикой</a> и обработкой персональных данных. Мы не шлём спам — только письма про подтверждение и сброс пароля.</span>
           </label>
 
-          {# Google reCAPTCHA v2 — только если задан публичный ключ. Виджет сам
-             добавляет в форму скрытое поле g-recaptcha-response для сервера. #}
+          {# Google reCAPTCHA v2 — только если заданы оба ключа. Виджет сам
+             добавляет в форму скрытое поле g-recaptcha-response для сервера.
+             Грузится с recaptcha.net: у части пользователей google.com режут. #}
           {% if request.state.captcha_sitekey %}
             <div class="g-recaptcha" data-sitekey="{{ request.state.captcha_sitekey }}"></div>
-            <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+            <script src="{{ request.state.captcha_script }}" async defer></script>
           {% endif %}
 
           <button type="submit" class="btn-primary w-full py-3">

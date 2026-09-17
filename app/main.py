@@ -511,12 +511,14 @@ _CSP = "; ".join(
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com "
         "https://unpkg.com https://cdn.jsdelivr.net https://mc.yandex.ru https://mc.yandex.com "
-        "https://yastatic.net https://telegram.org https://www.google.com https://www.gstatic.com",
+        "https://yastatic.net https://telegram.org https://www.google.com https://www.gstatic.com "
+        "https://www.recaptcha.net",
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
         "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
         "connect-src 'self' https://mc.yandex.ru https://mc.yandex.com https://yastatic.net",
-        "frame-src 'self' https://mc.yandex.ru https://www.google.com https://meet.jit.si",
+        "frame-src 'self' https://mc.yandex.ru https://www.google.com https://www.recaptcha.net "
+        "https://meet.jit.si",
         "base-uri 'self'",
         "form-action 'self'",
         "object-src 'none'",
@@ -540,9 +542,13 @@ async def _security_headers(
     # Контакты продавца в подвале — требование Robokassa при модерации сайта.
     request.state.contact_phone = _settings.contact_phone
     request.state.contact_city = _settings.contact_city
-    # Публичный ключ reCAPTCHA для виджета на форме регистрации. Пусто → форма
-    # рендерит без капчи (см. app/templates/auth/register.html).
-    request.state.captcha_sitekey = _settings.recaptcha_site_key
+    # Публичный ключ reCAPTCHA для виджета на форме регистрации. Виджет
+    # показываем, только если заданы ОБА ключа: иначе сервер проверку не
+    # делает, а человек зря решал бы капчу.
+    from app.auth.captcha import SCRIPT_URL, is_enabled
+
+    request.state.captcha_sitekey = _settings.recaptcha_site_key if is_enabled() else ""
+    request.state.captcha_script = SCRIPT_URL
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     # Tap Tower Mini App (/taptower/*) is loaded inside Telegram's frame, so
