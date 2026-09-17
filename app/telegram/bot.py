@@ -66,6 +66,7 @@ import app.telegram.models  # noqa: F401 — mapper warmup
 from app import timezones
 from app.auth.models import User
 from app.config import get_settings
+from app.digest.service import send_morning_digests_for_all_users
 from app.quickadd.parser import parse_quick_add
 from app.tasks.models import Task, TaskPriority
 from app.tasks.service import create_task, list_today, list_upcoming
@@ -701,6 +702,21 @@ async def _job_morning_digest(context: ContextTypes.DEFAULT_TYPE) -> None:
                 continue
             link.last_digest_sent_at = now
             await session.commit()
+
+        # Заодно отсюда же уходит утреннее письмо. Оно рассылается по тому же
+        # правилу («сейчас семь утра у получателя»), а значит, нужен часовой
+        # тик. Системный крон на сервере суточный, и завязывать фичу на то,
+        # что его однажды перенастроят, не хочется: задание бота и так
+        # просыпается каждый час, письмо просто едет вместе с ним. Эндпоинт
+        # /api/digest/cron-trigger остаётся запасным путём. Двойной отправки
+        # не будет — проверка «сегодня по времени получателя уже отправляли»
+        # в обоих местах одна и та же.
+        try:
+            counters = await send_morning_digests_for_all_users(session)
+            if counters["sent"]:
+                logger.info("morning email digests sent: %s", counters["sent"])
+        except Exception as e:
+            logger.warning("morning email digest sweep failed: %s", e)
 
 
 def build_doday_app() -> Application[Any, Any, Any, Any, Any, Any]:
