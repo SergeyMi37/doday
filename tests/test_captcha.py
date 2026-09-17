@@ -58,13 +58,15 @@ async def test_widget_shown_when_keys_set(client: AsyncClient, captcha_on: None)
 
 
 async def test_no_widget_without_keys(client: AsyncClient) -> None:
-    assert "g-recaptcha" not in (await client.get("/auth/register")).text
+    # Проверяем именно виджет: строка «g-recaptcha» есть и в коде проверки
+    # перед отправкой, она на странице всегда.
+    assert "data-sitekey" not in (await client.get("/auth/register")).text
 
 
 async def test_no_widget_when_only_site_key_set(client: AsyncClient) -> None:
     """Без секрета сервер ничего не проверяет — незачем заставлять решать."""
     get_settings().recaptcha_site_key = "6Ltest-site-key"
-    assert "g-recaptcha" not in (await client.get("/auth/register")).text
+    assert "data-sitekey" not in (await client.get("/auth/register")).text
 
 
 def test_csp_allows_the_widget() -> None:
@@ -116,3 +118,57 @@ async def test_google_outage_does_not_block_signup(
 
 async def test_disabled_captcha_always_passes() -> None:
     assert await captcha.verify("", None) is True
+
+
+# ── введённое не пропадает ────────────────────────────────────────────────
+
+
+async def test_email_and_consent_survive_an_error(client: AsyncClient, captcha_on: None) -> None:
+    """Ошибка не должна стоить человеку набранной почты и галочки."""
+    r = await client.post(
+        "/auth/register",
+        data={
+            "email": "vasya.petrov@gmail.com",
+            "password": "StrongPass12345",
+            "agree_privacy": "on",
+            "form_ts": signup_form_token(),
+        },
+    )
+    assert r.status_code == 400
+    assert "vasya.petrov@gmail.com" in r.text  # подставлено обратно в поле
+    assert "checked" in r.text  # галочка согласия осталась
+
+
+async def test_password_is_never_echoed_back(client: AsyncClient, captcha_on: None) -> None:
+    """Пароль обратно не возвращаем: он осел бы в кеше браузера и скриншотах."""
+    r = await client.post(
+        "/auth/register",
+        data={
+            "email": "vasya.petrov@gmail.com",
+            "password": "SuperSecret12345",
+            "agree_privacy": "on",
+            "form_ts": signup_form_token(),
+        },
+    )
+    assert "SuperSecret12345" not in r.text
+
+
+async def test_unchecked_consent_keeps_email(client: AsyncClient) -> None:
+    r = await client.post(
+        "/auth/register",
+        data={
+            "email": "masha@yandex.ru",
+            "password": "StrongPass12345",
+            "form_ts": signup_form_token(),
+        },
+    )
+    assert r.status_code == 400
+    assert "masha@yandex.ru" in r.text
+    assert "согласие" in r.text.lower()
+
+
+async def test_form_guards_captcha_before_submit(client: AsyncClient, captcha_on: None) -> None:
+    """Нерешённая капча не должна приводить к перезагрузке страницы."""
+    html = (await client.get("/auth/register")).text
+    assert "grecaptcha.getResponse()" in html
+    assert "Поставь галочку «Я не робот»" in html

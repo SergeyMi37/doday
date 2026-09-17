@@ -40,9 +40,25 @@
            x-data="{
              showPwd: false,
              capsOn: false,
-             email: '',
+             {# Введённое возвращается с сервера, чтобы после ошибки не набирать заново. #}
+             email: {{ (form_email or '')|tojson }},
              emailValid: false,
              pwd: '',
+             captchaError: false,
+             {# Капчу проверяем до отправки: иначе страница перезагрузится
+                и всё введённое пропадёт из-за одной невыставленной галочки. #}
+             submit(e) {
+               const widget = document.querySelector('.g-recaptcha');
+               if (!widget || typeof grecaptcha === 'undefined') return true;
+               if (grecaptcha.getResponse().length === 0) {
+                 e.preventDefault();
+                 this.captchaError = true;
+                 widget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                 return false;
+               }
+               this.captchaError = false;
+               return true;
+             },
              score() {
                const p = this.pwd;
                if (!p) return 0;
@@ -77,7 +93,8 @@
           </div>
         {% endif %}
 
-        <form method="post" action="/auth/register" class="space-y-5" autocomplete="on">
+        <form method="post" action="/auth/register" class="space-y-5" autocomplete="on"
+              @submit="submit($event)">
           {# Honeypot: поле-ловушка против ботов. Живой человек его не видит и не
              заполняет; боты заполняют все поля — такие регистрации отбрасываются,
              аккаунт не создаётся. #}
@@ -153,7 +170,8 @@
           </div>
 
           <label class="flex items-start gap-3 text-sm text-[var(--text-muted)] cursor-pointer pt-1">
-            <input type="checkbox" name="agree_privacy" required class="mt-0.5 accent-[var(--accent)] w-4 h-4">
+            <input type="checkbox" name="agree_privacy" required class="mt-0.5 accent-[var(--accent)] w-4 h-4"
+                   {% if form_agree %}checked{% endif %}>
             <span>Согласен с <a href="/privacy" class="text-[var(--accent)] hover:underline">политикой</a> и обработкой персональных данных. Мы не шлём спам — только письма про подтверждение и сброс пароля.</span>
           </label>
 
@@ -161,7 +179,14 @@
              добавляет в форму скрытое поле g-recaptcha-response для сервера.
              Грузится с recaptcha.net: у части пользователей google.com режут. #}
           {% if request.state.captcha_sitekey %}
-            <div class="g-recaptcha" data-sitekey="{{ request.state.captcha_sitekey }}"></div>
+            <div>
+              <div class="g-recaptcha" data-sitekey="{{ request.state.captcha_sitekey }}"></div>
+              <p x-show="captchaError" x-cloak x-transition
+                 class="text-xs text-rose-400 mt-2 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                Поставь галочку «Я не робот» — без неё форма не отправится.
+              </p>
+            </div>
             <script src="{{ request.state.captcha_script }}" async defer></script>
           {% endif %}
 

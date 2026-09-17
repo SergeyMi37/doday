@@ -42,6 +42,28 @@ async def register_form(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "auth/register.html", {"error": None})
 
 
+def _register_error(
+    request: Request,
+    message: str,
+    *,
+    email: str = "",
+    agree: bool = False,
+    status_code: int = 400,
+) -> HTMLResponse:
+    """Перерисовать форму с ошибкой, сохранив введённое.
+
+    Пароль сознательно не возвращаем: он попал бы в HTML ответа, а оттуда в
+    кеш браузера, историю и любой скриншот. Остальное сохраняем — набирать
+    почту заново из-за неотмеченной галочки обидно.
+    """
+    return templates.TemplateResponse(
+        request,
+        "auth/register.html",
+        {"error": message, "form_email": email, "form_agree": agree},
+        status_code=status_code,
+    )
+
+
 @router.post("/register", response_model=None)
 async def register_submit(
     request: Request,
@@ -59,15 +81,17 @@ async def register_submit(
     if website.strip():
         return RedirectResponse(url="/auth/verify-pending?signup=1", status_code=303)
 
+    agree = agree_privacy == "on"
     ip = client_ip(request)
     # Было 5 в минуту (7200 в сутки) — этого хватило, чтобы за раз завели
     # 170 аккаунтов. Оставляем короткий всплеск на опечатки в форме, а
     # настоящее ограничение считается по БД ниже.
     if not hit(client_key(ip, "register"), max_calls=3, per_seconds=600):
-        return templates.TemplateResponse(
+        return _register_error(
             request,
-            "auth/register.html",
-            {"error": "Слишком много попыток. Подожди минуту и попробуй снова."},
+            "Слишком много попыток. Подожди минуту и попробуй снова.",
+            email=email,
+            agree=agree,
             status_code=429,
         )
 
@@ -77,29 +101,20 @@ async def register_submit(
     from app.auth.captcha import verify as verify_captcha
 
     if not await verify_captcha(captcha_token, ip):
-        return templates.TemplateResponse(
-            request,
-            "auth/register.html",
-            {"error": "Подтверди, что ты не робот (капча)."},
-            status_code=400,
+        return _register_error(
+            request, "Подтверди, что ты не робот (капча).", email=email, agree=agree
         )
 
-    if agree_privacy != "on":
-        return templates.TemplateResponse(
-            request,
-            "auth/register.html",
-            {"error": "Нужно дать согласие на обработку персональных данных."},
-            status_code=400,
+    if not agree:
+        return _register_error(
+            request, "Нужно дать согласие на обработку персональных данных.", email=email
         )
 
     try:
         payload = RegisterIn(email=email, password=password)
     except ValidationError:
-        return templates.TemplateResponse(
-            request,
-            "auth/register.html",
-            {"error": "Проверь email и пароль (от 8 символов)."},
-            status_code=400,
+        return _register_error(
+            request, "Проверь email и пароль (от 8 символов).", email=email, agree=agree
         )
 
     # Три проверки против массовой регистрации. Порядок от дешёвых к дорогим:
@@ -111,22 +126,12 @@ async def register_submit(
         await antibot.check_signup_rate(session, ip)
     except antibot.SignupRejected as exc:
         _log.info("signup_rejected", code=exc.log_code, ip=ip)
-        return templates.TemplateResponse(
-            request,
-            "auth/register.html",
-            {"error": exc.reason},
-            status_code=400,
-        )
+        return _register_error(request, exc.reason, email=email, agree=agree)
 
     try:
         user = await register_user(session, payload)
     except EmailAlreadyExists:
-        return templates.TemplateResponse(
-            request,
-            "auth/register.html",
-            {"error": "Этот email уже зарегистрирован."},
-            status_code=400,
-        )
+        return _register_error(request, "Этот email уже зарегистрирован.", email=email, agree=agree)
 
     # Откуда пришла регистрация — по этим полям считается частота.
     user.signup_ip = ip
