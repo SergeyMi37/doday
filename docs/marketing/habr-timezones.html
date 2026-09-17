@@ -1,0 +1,934 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Хабр: часовые пояса по-настоящему</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 760px; margin: 0 auto; padding: 1em; line-height: 1.6; color: #222; background: #fafafa; }
+  .toolbar { position: sticky; top: 0; z-index: 10; background: #fafafa; padding: 1em 0; border-bottom: 1px solid #ddd; margin-bottom: 1em; display: flex; gap: 0.6em; align-items: center; flex-wrap: wrap; }
+  .toolbar button { padding: 0.6em 1.2em; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 0.95em; transition: all 0.15s; }
+  .btn-primary { background: #1a73e8; color: white; }
+  .btn-primary:hover { background: #1557b0; }
+  .btn-primary.ok { background: #16a34a; }
+  .hint { font-size: 0.85em; color: #666; }
+  .instructions { background: #fffbea; border-left: 4px solid #f59e0b; padding: 1em 1.2em; margin: 1em 0 2em; border-radius: 4px; font-size: 0.92em; }
+  .instructions h3 { margin-top: 0; color: #92400e; font-size: 1.1em; }
+  .instructions ol { padding-left: 1.4em; margin: 0.5em 0; }
+  .checklist { background: #ecfdf5; border-left: 4px solid #10b981; padding: 1em 1.2em; margin: 1em 0 2em; border-radius: 4px; font-size: 0.92em; }
+  .checklist h3 { margin-top: 0; color: #065f46; font-size: 1.05em; }
+  .checklist ol { padding-left: 1.4em; margin: 0.5em 0; list-style: decimal; }
+  .checklist input[type="checkbox"] { margin-right: 0.4em; vertical-align: middle; }
+  .checklist code { background: #fff; padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.95em; }
+  .article { background: white; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .article h1 { font-size: 1.8em; border-bottom: 2px solid #eee; padding-bottom: 0.3em; margin-top: 0; }
+  .article h2 { font-size: 1.4em; margin-top: 1.8em; border-bottom: 1px solid #eee; padding-bottom: 0.2em; }
+  .article h3 { font-size: 1.15em; }
+  .section-card { background: white; border-radius: 8px; padding: 1em 1.5em; margin-bottom: 1em; box-shadow: 0 1px 4px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; }
+  .section-header { display: flex; align-items: center; gap: 0.75em; padding-bottom: 0.6em; border-bottom: 1px solid #eee; margin-bottom: 1em; flex-wrap: wrap; }
+  .section-num { display: inline-flex; align-items: center; justify-content: center; width: 1.8em; height: 1.8em; background: #2563eb; color: white; border-radius: 50%; font-weight: 700; font-size: 0.85em; flex-shrink: 0; }
+  .section-title { flex: 1; font-weight: 600; min-width: 0; }
+  .btn-copy-section { padding: 0.5em 1em; border-radius: 6px; border: 1px solid #2563eb; background: white; color: #2563eb; cursor: pointer; font-weight: 600; font-size: 0.88em; transition: all 0.15s; flex-shrink: 0; }
+  .btn-copy-section:hover { background: #2563eb; color: white; }
+  .btn-copy-section.ok { background: #16a34a; color: white; border-color: #16a34a; }
+  .section-body { font-size: 0.95em; line-height: 1.6; color: #444; }
+  .section-body h2 { font-size: 1.3em; margin: 0 0 0.5em 0; color: #1e293b; }
+  .section-body p { margin: 0.5em 0; }
+  .section-body code { background: #f4f4f4; padding: 0.1em 0.3em; border-radius: 3px; }
+  .section-body a { color: #2563eb; }
+  .article code { background: #f4f4f4; padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.92em; }
+  .article pre { background: #f4f4f4; padding: 1em; overflow-x: auto; border-radius: 4px; }
+  .article blockquote { border-left: 4px solid #ccc; padding-left: 1em; color: #555; margin-left: 0; }
+  .article table { border-collapse: collapse; width: 100%; }
+  .article th, .article td { border: 1px solid #ddd; padding: 0.5em 0.8em; text-align: left; }
+  .article th { background: #f4f4f4; }
+  .article a { color: #0066cc; }
+  .article ul, .article ol { padding-left: 1.4em; }
+  .article li { margin: 0.25em 0; }
+  .article hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button id="copy-btn" class="btn-primary" onclick="copyPost()">📋 Скопировать пост</button>
+  <span class="hint">→ Вставь Ctrl+V в редактор Хабр</span>
+</div>
+
+<div class="instructions">
+<h3>Как опубликовать</h3>
+<ol>
+<li>Жми синюю кнопку <strong>«📋 Скопировать пост»</strong> сверху.</li>
+<li>В редакторе Хабр удали старый текст если был, нажми <code>Ctrl+V</code>.</li>
+<li><strong>Важная особенность:</strong> Откройте страницу /raw, скопируйте Markdown целиком и вставьте его в Markdown-режим редактора Хабра — заголовки и блоки кода приедут как есть. Картинок в статье нет, нужна только обложка 780×440 в поле «Отображение публикации в ленте».</li>
+<li>Используй чек-лист ниже чтобы не забыть ни один заголовок.</li>
+</ol>
+</div>
+
+<div class="checklist">
+<h3>Чек-лист: заголовки которые нужно сделать H2 в редакторе Хабр</h3>
+<p style="margin: 0 0 0.6em 0;">После вставки найди эти заголовки (они будут как обычный текст), выдели каждый, нажми «H2» в панели форматирования:</p>
+<ol>
+<li><label><input type="checkbox" class="hl-check"> <code>Как это выглядело для человека</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Пояс — это не параметр функции, а свойство пользователя</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Один модуль, который знает про день</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Самое неочевидное: у задачи два разных вида срока</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Postgres: как не потерять индекс на ровном месте</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Как пояс доезжает до шаблонов</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Автоопределение: браузер знает, спрашивать не надо</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Дайджест: крон раз в сутки не бывает утренним</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Заодно нашлись три копии одной серии</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Как это тестировать и не сойти с ума</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Что в итоге</code></label></li>
+</ol>
+<p style="margin: 0.6em 0 0 0; font-size: 0.85em; color: #666;">Галочки сохранятся пока ты не закроешь страницу. Клики на этой странице ничего не делают с самим постом — это просто блокнот для тебя.</p>
+</div>
+
+<div style="background: #eff6ff; border-left: 4px solid #2563eb; padding: 1em 1.2em; margin: 1em 0 2em; border-radius: 4px; font-size: 0.92em;">
+<h3 style="margin-top: 0; color: #1e40af; font-size: 1.05em;">🔥 Если ОДНА большая вставка не работает (VC.ru ругается «слишком много текста»)</h3>
+<p>Копируй по <strong>СЕКЦИЯМ</strong> ниже. Каждая секция = заголовок H2 + параграфы под ним. Жми «📋 Скопировать секцию», вставляй в редактор Хабр, после вставки выдели первую строку (заголовок) и нажми H2 в их панели. Повтори для каждой из 12 секций.</p>
+</div>
+
+<div id="sections-list">
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">1</span>
+    <span class="section-title">Введение (TL;DR + первые параграфы)</span>
+    <button class="btn-copy-section" onclick="copySection('sec-0', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-0"><h1>Я починил часовые пояса в одной функции и решил, что закончил. Их было двадцать</h1>
+<hr />
+<p>В конце августа я выложил статью про то, как разбирал строку «Сдать реферат завтра в 18:00». Там был честный баг: парсер брал сегодняшнюю дату по UTC, поэтому около полуночи «завтра» получалось не тем завтра. Я передал в парсер часовой пояс, написал тест с фиксированным временем, порадовался и закрыл вкладку.</p>
+<p>Потом я открыл своё же приложение вечером, около полуночи, и увидел, что задача на час ночи понедельника лежит в воскресном списке.</p>
+<p>Парсер тут был уже ни при чём. Он-то честно посчитал момент. Просто в остальном приложении «день» по-прежнему считался в UTC — в двух десятках мест, каждое со своей копией одной и той же арифметики.</p>
+<p>Это статья про то, как я приводил это в порядок: что оказалось неочевидным, где я сначала сделал неправильно, и какие тесты имело смысл написать.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">2</span>
+    <span class="section-title">Как это выглядело для человека</span>
+    <button class="btn-copy-section" onclick="copySection('sec-1', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-1"><h2>Как это выглядело для человека</h2><p>Симптомы выглядели как разные баги, а причина у них была одна.</p>
+<p><strong>Список «Сегодня» заканчивался в три часа ночи.</strong> Сутки считались так:</p>
+<pre><code class="language-python">now = datetime.now(UTC)
+tomorrow = datetime(now.year, now.month, now.day, tzinfo=UTC) + timedelta(days=1)
+</code></pre>
+<p>Для Москвы граница «завтра» приходилась на 03:00 по местному времени. Задача, поставленная на 01:00 понедельника, была «ещё воскресной»: по UTC в этот момент действительно воскресенье, 22:00.</p>
+<p><strong>Серия выполненных дней рвалась у полуночников.</strong> Серия — это сколько дней подряд человек закрыл хотя бы одну задачу. Считалась она по <code>date(completed_at)</code> при соединении с базой в UTC. Закрываешь последнюю задачу в 00:30 — отметка уходит в следующие сутки, а вчерашние остаются пустыми. Серия обнуляется, хотя человек ничего не пропустил.</p>
+<p><strong>Бот желал доброго утра в четыре часа дня.</strong> Утренняя сводка была поставлена на 06:00 UTC — «примерно девять по Москве». Для Владивостока это четыре часа дня, для Калининграда восемь утра.</p>
+<p><strong>«Завтра в 18:00» из Telegram уезжало на три часа.</strong> В веб-интерфейсе пояс в парсер передавался, а бот вызывал ту же функцию без него. Значением по умолчанию там стоял UTC.</p>
+<p>Общее у всех четырёх одно: программа знала, который час на сервере, и не знала, который час у человека.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">3</span>
+    <span class="section-title">Пояс — это не параметр функции, а свойство пользователя</span>
+    <button class="btn-copy-section" onclick="copySection('sec-2', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-2"><h2>Пояс — это не параметр функции, а свойство пользователя</h2><p>Первая версия (та, из прошлой статьи) передавала имя пояса из браузера вместе с текстом задачи. Для парсера этого хватало, но как модель это неверно: пояс не относится к одной операции, он относится к человеку. Его нужно где-то хранить.</p>
+<p>Колонка получилась такая:</p>
+<pre><code class="language-python">timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+timezone_auto: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=&quot;true&quot;)
+</code></pre>
+<p>Два решения, которые я бы выделил.</p>
+<p><strong>Хранится имя, а не смещение.</strong> Соблазн записать <code>+03:00</code> большой — это одно число, с ним удобно считать. Но смещение меняется: в половине мира дважды в год, а иногда и по решению правительства — в России часовые пояса переезжали на моей памяти. Имя <code>Europe/Moscow</code> переживает такие изменения, потому что настоящее смещение каждый раз берётся из базы tzdata, которая обновляется вместе с системой.</p>
+<p><strong><code>NULL</code> разрешён и означает «браузер ещё не сказал».</strong> Тогда берётся пояс по умолчанию — у меня московский, потому что аудитория в основном российская. Ошибиться на час для Екатеринбурга лучше, чем на три для всех.</p>
+<p>Заодно это чинит место, куда пояс никак было не передать. В Telegram Mini App у меня в коде висел комментарий: «TG WebView не сообщает часовой пояс, берём UTC как baseline» — и из-за этого мини-приложение желало доброго утра когда придётся. Теперь ему ничего передавать не надо: пояс лежит в профиле, а прислал его обычный браузер, когда человек заходил с компьютера.</p>
+<p>Флаг <code>timezone_auto</code> появился позже, и про него дальше.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">4</span>
+    <span class="section-title">Один модуль, который знает про день</span>
+    <button class="btn-copy-section" onclick="copySection('sec-3', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-3"><h2>Один модуль, который знает про день</h2><p>Дальше я завёл <code>app/timezones.py</code> и договорился сам с собой: везде, где в коде появляется слово «день», вызов идёт сюда. Никаких <code>datetime.now(UTC).date()</code> по месту.</p>
+<p>Ядро — границы суток:</p>
+<pre><code class="language-python">def day_bounds(name: str | None, day: date | None = None) -&gt; tuple[datetime, datetime]:
+    &quot;&quot;&quot;Границы локальных суток в UTC: [начало дня, начало следующего дня).&quot;&quot;&quot;
+    zone = zone_of(name)
+    if day is None:
+        day = datetime.now(zone).date()
+    start = datetime.combine(day, time.min, tzinfo=zone)
+    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone)
+    return start.astimezone(UTC), end.astimezone(UTC)
+</code></pre>
+<p>Здесь две вещи сделаны специально.</p>
+<p><strong>Возвращается полуинтервал, а не «до 23:59:59».</strong> Задача со сроком 23:59:59.5 не попадала никуда: в сегодня уже поздно, в завтра ещё рано. Такие сроки появляются, если время пришло из внешнего календаря.</p>
+<p><strong>Конец суток строится от календарной даты, а не прибавлением 24 часов.</strong> Это как раз то место, где обычно и появляется ошибка. Сутки не всегда длятся 24 часа: в день перехода на летнее время их 23, при обратном переходе — 25.</p>
+<p>Проверяется это тестом, который не зависит от того, когда его запустили:</p>
+<pre><code class="language-python">def test_day_is_23_hours_when_clocks_move_forward() -&gt; None:
+    &quot;&quot;&quot;Лондон, 29 марта 2026: в 01:00 стрелки прыгают на 02:00.&quot;&quot;&quot;
+    start, end = day_bounds(&quot;Europe/London&quot;, date(2026, 3, 29))
+    assert end - start == timedelta(hours=23)
+    assert end == day_start(&quot;Europe/London&quot;, date(2026, 3, 30))
+</code></pre>
+<p>Если бы конец суток считался как «начало плюс сутки», он уехал бы на час вперёд и первый час следующего дня попал бы во вчерашний список. Раз в год, на один день. Такое почти невозможно заметить в проде и очень легко закрыть тестом на конкретную дату.</p>
+<p>Тут можно возразить: в России часы не переводят с 2014 года, а пользователи у меня в основном российские. Верно — но, во-первых, код общий, и завтра в нём окажется Алматы или Белград. А во-вторых, серия выполненных дней считается по всей истории, и в этой истории переводы часов есть: до 2014-го их переводили и здесь. Заглядывать в такие вещи самому не надо — tzdata знает.</p>
+<p>Второй тест — зеркальный, на 25-часовые сутки. Я сначала написал его на Сантьяго 5 апреля, тест упал, и я полез спорить с кодом. Оказалось, спорить надо было с собой: переход там 4 апреля. Это, в общем, и есть главный аргумент за то, чтобы брать даты переходов из tzdata, а не из головы.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">5</span>
+    <span class="section-title">Самое неочевидное: у задачи два разных вида срока</span>
+    <button class="btn-copy-section" onclick="copySection('sec-4', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-4"><h2>Самое неочевидное: у задачи два разных вида срока</h2><p>Вот на чём я сначала сделал неправильно.</p>
+<p>Я перевёл все сравнения на границы суток пользователя и обрадовался. Потом дописал тест на переезд — и он упал.</p>
+<p>Дело в том, что «в 18:00» и «в четверг» — это разные сущности, хотя в базе лежат в одной колонке.</p>
+<p><strong>«Позвонить в 18:00» — момент времени.</strong> Точка на шкале. Если человек переехал из Москвы в Магадан, момент остался прежним, поменялось только то, как он выглядит на часах. Такой срок обязан ехать вместе с человеком.</p>
+<p><strong>«Сдать реферат в четверг» — календарная дата.</strong> За ней нет никакого момента. Четверг остаётся четвергом и в Калининграде, и на Камчатке. Такой срок ехать не должен ни при каких обстоятельствах.</p>
+<p>В Doday исторически и то и другое лежит в одной колонке <code>due_at</code> с флагом <code>due_date_only</code>. Дата без времени сохраняется как момент внутри этих суток по UTC: парсер кладёт 23:59, форма — полночь. Схему я менять не стал (это живые данные), но правило сравнения развёл:</p>
+<pre><code class="language-python">def due_before(day: date, tz: str | None) -&gt; ColumnElement[bool]:
+    &quot;&quot;&quot;Срок раньше начала дня `day` — с поправкой на два вида срока.&quot;&quot;&quot;
+    return or_(
+        and_(Task.due_date_only.is_(False), Task.due_at &lt; timezones.day_start(tz, day)),
+        and_(Task.due_date_only.is_(True), Task.due_at &lt; timezones.floating_start(day)),
+    )
+</code></pre>
+<p><code>day_start</code> переводит начало суток в UTC через пояс пользователя, <code>floating_start</code> — просто берёт полночь UTC. Момент сравнивается по поясу, календарная дата — как чистая дата.</p>
+<p>Если этого не сделать, получается красивая катастрофа: человек переезжает во Владивосток, и все дедлайны «на день» разом сдвигаются на сутки. Причём в базе ничего не менялось, поэтому искать такое вы будете долго.</p>
+<p>Два теста, которые держат это разделение:</p>
+<pre><code class="language-python">def test_timed_deadline_moves_with_the_person() -&gt; None:
+    moment = datetime(2026, 9, 17, 22, 0, tzinfo=UTC)
+    assert due_day(moment, date_only=False, tz=&quot;UTC&quot;) == date(2026, 9, 17)
+    assert due_day(moment, date_only=False, tz=&quot;Europe/Moscow&quot;) == date(2026, 9, 18)
+
+def test_date_only_deadline_does_not_move() -&gt; None:
+    thursday = datetime(2026, 9, 17, 23, 59, tzinfo=UTC)
+    for tz in (&quot;UTC&quot;, &quot;Europe/Moscow&quot;, &quot;Asia/Kamchatka&quot;, &quot;America/Los_Angeles&quot;):
+        assert due_day(thursday, date_only=True, tz=tz) == date(2026, 9, 17)
+</code></pre>
+<p>Если вы только проектируете схему — храните это в двух колонках, <code>due_date</code> и <code>due_at</code>. Флаг работает, но каждый, кто придёт в код после вас, будет об это спотыкаться.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">6</span>
+    <span class="section-title">Postgres: как не потерять индекс на ровном месте</span>
+    <button class="btn-copy-section" onclick="copySection('sec-5', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-5"><h2>Postgres: как не потерять индекс на ровном месте</h2><p>Дни считались не только в Python, но и в запросах — «сколько закрыто сегодня», «дни для тепловой карты». Везде стояло <code>func.date(Task.completed_at)</code>, а соединение с базой живёт в UTC, поэтому и дата получалась в UTC.</p>
+<p>Первым порывом было заменить это на <code>date(completed_at AT TIME ZONE 'Europe/Moscow')</code>. Работает, но у такого сравнения есть неприятное свойство: функция навешана на колонку, и обычный индекс по <code>completed_at</code> для неё бесполезен — база читает всё подряд.</p>
+<p>Поэтому там, где нужен диапазон, сравнивается сама колонка с двумя константами:</p>
+<pre><code class="language-python">day_start, day_end = timezones.day_bounds(user.timezone, today_date)
+...
+Task.completed_at &gt;= day_start,
+Task.completed_at &lt; day_end,
+</code></pre>
+<p>Границы считает Python, база просто сравнивает значения и спокойно берёт индекс.</p>
+<p>Перевод в поясе остался только там, где он действительно нужен — в группировке по дням:</p>
+<pre><code class="language-python">def local_date_sql(column, name):
+    return func.date(func.timezone(normalize(name), column))
+</code></pre>
+<p>Тут выбора нет: дней много, и раскладывать их по корзинам должна база. Приятно, что Postgres пользуется той же базой tzdata, что и Python, так что расхождений между тем, что посчитала база, и тем, что посчитал код, не возникает.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">7</span>
+    <span class="section-title">Как пояс доезжает до шаблонов</span>
+    <button class="btn-copy-section" onclick="copySection('sec-6', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-6"><h2>Как пояс доезжает до шаблонов</h2><p>Тут я чуть не сделал грязно.</p>
+<p>Сервисы получают пояс явным аргументом — это правильно, потому что зовут их не только из HTTP, но и из бота, и из крона, где никакого «текущего пользователя» нет:</p>
+<pre><code class="language-python">async def list_today(session, user_id, *, tz: str | None = None) -&gt; list[Task]: ...
+</code></pre>
+<p>А вот шаблонным функциям — тем, что рисуют на строке задачи «Сегодня», «Завтра» или красят просроченное, — аргумент прокинуть некуда. Они вызываются из вложенных партиалов, которые подключаются из полусотни мест. Прокидывать пояс через каждый <code>{% include %}</code> — значит однажды где-нибудь его забыть и потом ловить одну строку, которая покрашена не так, как соседние.</p>
+<p>Для них пояс кладётся в контекст запроса ровно один раз, там, где пользователь и так загружается:</p>
+<pre><code class="language-python"># app/auth/deps.py
+timezones.use(user.timezone)
+</code></pre>
+<p>Внутри — обычный <code>ContextVar</code>. У каждого запроса свой контекст, потому что asyncio копирует его при создании задачи, так что чужой пояс сюда не протечёт.</p>
+<p>Граница получилась такая: неявный пояс живёт только в слое отображения, всё, что ходит в базу, принимает его параметром. Правило простое и, главное, его видно в коде: если в сервисе появился <code>timezones.current()</code> — что-то пошло не туда.</p>
+<p>Кстати, ровно этот же механизм пригодился в неожиданном месте. Есть страница, где родитель по ссылке смотрит прогресс ребёнка. «Сегодня» там — сегодня у ребёнка, а не у родителя, даже если они в разных поясах. Одна строка <code>timezones.use(child.timezone)</code> — и все подписи на странице встали в детский день.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">8</span>
+    <span class="section-title">Автоопределение: браузер знает, спрашивать не надо</span>
+    <button class="btn-copy-section" onclick="copySection('sec-7', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-7"><h2>Автоопределение: браузер знает, спрашивать не надо</h2><p>Пояс мог бы быть настройкой. Но настройку, которую надо найти и выставить, не выставляет никто.</p>
+<p>Браузер знает пояс точно:</p>
+<pre><code class="language-javascript">Intl.DateTimeFormat().resolvedOptions().timeZone  // &quot;Europe/Moscow&quot;
+</code></pre>
+<p>Каждая страница сравнивает это значение с сохранённым и, если они разошлись, отправляет новое:</p>
+<pre><code class="language-javascript">if (!auto || zone === known) return;
+fetch('/api/profile/timezone', {method: 'POST', body: body, credentials: 'same-origin'})
+</code></pre>
+<p>Три мелочи, которые делают это приличным:</p>
+<ul>
+<li><strong>запрос уходит только при несовпадении.</strong> Обычная загрузка страницы не делает лишнего похода на сервер;</li>
+<li><strong>переезд подхватывается сам.</strong> Человек прилетел в другой город, открыл приложение — «Сегодня» уже правильное. Ничего настраивать не надо, уведомлять тоже не надо;</li>
+<li><strong>строка проверяется на сервере.</strong> Прилететь в это поле может что угодно, поэтому имя сверяется с базой tzdata, а неизвестное отвергается с 422.</li>
+</ul>
+<p>И один случай, который я сначала не учёл: человек может выбрать пояс руками. У того, кто живёт на два города или работает по чужому расписанию, своё мнение о том, где у него день, и перебивать его автоматикой нельзя. Для этого и нужен <code>timezone_auto</code>: после ручного выбора браузер молчит, пока в настройках не вернут «определять автоматически».</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">9</span>
+    <span class="section-title">Дайджест: крон раз в сутки не бывает утренним</span>
+    <button class="btn-copy-section" onclick="copySection('sec-8', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-8"><h2>Дайджест: крон раз в сутки не бывает утренним</h2><p>Утреннее письмо отправлял крон, который срабатывал раз в день и рассылал всем сразу. Это не чинится настройкой времени крона: в Москве в этот момент утро, во Владивостоке день, в Калининграде ночь.</p>
+<p>Правильный вариант — наоборот: крон приходит <strong>раз в час</strong>, а письмо получает тот, у кого сейчас семь утра по его часам.</p>
+<pre><code class="language-python">local_now = now.astimezone(timezones.zone_of(user.timezone))
+if local_now.hour != hour:
+    counters[&quot;skipped_not_morning&quot;] += 1
+    continue
+last = user.morning_digest_last_sent_at
+if last is not None and last &gt;= timezones.day_start(user.timezone, local_now.date()):
+    counters[&quot;skipped_already&quot;] += 1
+    continue
+</code></pre>
+<p>Две детали. Первая: защита от повтора сравнивается с началом суток <strong>пользователя</strong>, а не с полуночью UTC. Вторая: отбирать кандидатов запросом «у кого сейчас семь утра» не получится — пояс лежит строкой, и считать это в SQL неудобно. Поэтому в базе стоит грубый предфильтр («кому не отправляли последние двенадцать часов»), а точная проверка идёт в Python, уже зная пояс каждого. Пользователей с включённым дайджестом немного, так что это честнее, чем городить хитрый запрос.</p>
+<p>Тем же способом чинится и утренняя сводка в боте: задание крутится раз в час и забирает тех, у кого сейчас девять. Там понадобилась отдельная отметка о последней отправке — иначе перезапуск бота внутри того же часа присылал бы человеку второе «доброе утро».</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">10</span>
+    <span class="section-title">Заодно нашлись три копии одной серии</span>
+    <button class="btn-copy-section" onclick="copySection('sec-9', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-9"><h2>Заодно нашлись три копии одной серии</h2><p>Пока я ходил по коду и менял <code>datetime.now(UTC).date()</code>, обнаружилось, что серия выполненных дней считается в трёх местах: в сервисе статистики, в отдельном эндпоинте для значка в шапке и в достижениях. Три реализации, написанные в разное время.</p>
+<p>Логика совпадала не полностью. Значок в шапке смотрел на историю за последние 400 дней, страница статистики — за всё время. Текущая серия от этого не менялась, а вот «лучшая серия» у одного и того же человека могла быть разной в двух местах на одном экране. Я это видел и до сих пор считал, что мне кажется.</p>
+<p>Теперь функция одна, а два других места её зовут. Тест, который держит это:</p>
+<pre><code class="language-python">badge = await streak_summary(db_session, user.id, tz=user.timezone)
+page = await compute_user_stats(db_session, user.id, tz=user.timezone)
+assert badge[&quot;current&quot;] == page[&quot;current_streak&quot;]
+</code></pre>
+<p>Там же вскрылась ещё одна мелочь, которая мне понравилась. Есть достижение «жаворонок»: закрыть пять задач до девяти утра. Час брался прямо из отметки времени, то есть по UTC, — значит, на самом деле оно выдавалось за задачи, закрытые до полудня по Москве. Ровно наоборот работал «ночной филин»: порог 22:00 UTC — это час ночи. Оба достижения годами выдавались не тем людям, и пожаловаться на это, конечно, никто не мог: как ты докажешь, что не жаворонок.</p>
+<p>Всё это не про часовые пояса напрямую, но нашлось ровно потому, что я пошёл править все места, а не одно.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">11</span>
+    <span class="section-title">Как это тестировать и не сойти с ума</span>
+    <button class="btn-copy-section" onclick="copySection('sec-10', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-10"><h2>Как это тестировать и не сойти с ума</h2><p>Главное правило: <strong>тест не должен зависеть от того, когда его запустили.</strong> Иначе половина сломается дважды в год, а ещё одна — когда прогон случайно попадёт на полночь.</p>
+<p>Поэтому везде, где можно, задаются конкретная дата и конкретный пояс. А там, где всё-таки нужно «сейчас», граничное время берётся не константой, а у самого модуля:</p>
+<pre><code class="language-python">task.completed_at = timezones.day_end(&quot;Europe/Moscow&quot;, timezones.today_in(&quot;Europe/Moscow&quot;))
+task.completed_at -= timedelta(minutes=30)
+</code></pre>
+<p>Это половина двенадцатого ночи по Москве в любой день года, независимо от того, когда гоняется тест.</p>
+<p>Набор случаев, который я бы советовал прогнать на своём проекте:</p>
+<ul>
+<li>несколько минут до и после полуночи в поясе пользователя;</li>
+<li>сервер в UTC, пользователь восточнее и западнее Гринвича;</li>
+<li>день перехода на летнее время в обе стороны (23 и 25 часов);</li>
+<li>пользователь сменил пояс: что стало с задачей на время и что — с задачей на дату;</li>
+<li>границы недели и месяца, а не только суток;</li>
+<li>рассылка, которая должна приходить утром;</li>
+<li>тот же код, вызванный не из HTTP — из бота, крона, консольной команды.</li>
+</ul></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">12</span>
+    <span class="section-title">Что в итоге</span>
+    <button class="btn-copy-section" onclick="copySection('sec-11', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-11"><h2>Что в итоге</h2><p>Разбор строки «завтра в 18:00» был верхушкой. Настоящая работа началась там, где я перестал чинить функции по одной и завёл одно место, которое знает, что такое день.</p>
+<p>Если формулировать коротко, правил три:</p>
+<ol>
+<li><strong>В базе — UTC, на экране — пояс пользователя, и границы суток считаются только по нему.</strong></li>
+<li><strong>Момент времени и календарная дата — разные вещи.</strong> Первый едет за человеком, вторая не едет никогда.</li>
+<li><strong>Пояс должен приезжать сам.</strong> Настройку, которую надо искать, никто не выставит.</li>
+</ol>
+<p>Код проекта открыт: <a href="https://github.com/SwairIt/doday">github.com/SwairIt/doday</a>. Сам проект — <a href="https://getdoday.ru/">getdoday.ru</a>, это планировщик для учёбы: задачи, расписание, домашка.</p>
+<p>Код и эту статью я готовил в паре с ИИ-агентом: он помогал собирать граничные случаи и проверять формулировки, решения и тесты я проверял на коде проекта.</p>
+<p>Ярослав Боев.</p>
+<p>Спасибо, что дочитали.</p></div>
+</div>
+
+</div>
+
+<details style="margin-top: 2em; background: white; padding: 1em 1.5em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+<summary style="cursor: pointer; font-weight: 600; color: #1a73e8;">Запасной запасной вариант: plain text с маркерами заголовков</summary>
+<p style="margin: 1em 0 0.6em 0; font-size: 0.92em; color: #555;">
+Если совсем ничего не работает — выдели текст ниже (клик в поле → Ctrl+A → Ctrl+C) и вставь в редактор Хабр.
+Заголовки помечены ▶ <code>═══ H2: ... ═══</code> ◀ — найди каждый в редакторе, выдели, нажми H2, удали маркеры.
+</p>
+<textarea readonly id="plain-textarea" style="width: 100%; height: 400px; font-family: 'SF Mono', Consolas, monospace; font-size: 0.85em; padding: 1em; border: 1px solid #ddd; border-radius: 4px; resize: vertical; line-height: 1.5;" onclick="this.select()">Я ПОЧИНИЛ ЧАСОВЫЕ ПОЯСА В ОДНОЙ ФУНКЦИИ И РЕШИЛ, ЧТО ЗАКОНЧИЛ. ИХ БЫЛО ДВАДЦАТЬ
+
+
+---
+
+В конце августа я выложил статью про то, как разбирал строку «Сдать реферат завтра в 18:00». Там был честный баг: парсер брал сегодняшнюю дату по UTC, поэтому около полуночи «завтра» получалось не тем завтра. Я передал в парсер часовой пояс, написал тест с фиксированным временем, порадовался и закрыл вкладку.
+
+Потом я открыл своё же приложение вечером, около полуночи, и увидел, что задача на час ночи понедельника лежит в воскресном списке.
+
+Парсер тут был уже ни при чём. Он-то честно посчитал момент. Просто в остальном приложении «день» по-прежнему считался в UTC — в двух десятках мест, каждое со своей копией одной и той же арифметики.
+
+Это статья про то, как я приводил это в порядок: что оказалось неочевидным, где я сначала сделал неправильно, и какие тесты имело смысл написать.
+
+
+═══ H2: Как это выглядело для человека ═══
+
+
+Симптомы выглядели как разные баги, а причина у них была одна.
+
+Список «Сегодня» заканчивался в три часа ночи. Сутки считались так:
+
+`python
+now = datetime.now(UTC)
+tomorrow = datetime(now.year, now.month, now.day, tzinfo=UTC) + timedelta(days=1)
+`
+
+Для Москвы граница «завтра» приходилась на 03:00 по местному времени. Задача, поставленная на 01:00 понедельника, была «ещё воскресной»: по UTC в этот момент действительно воскресенье, 22:00.
+
+Серия выполненных дней рвалась у полуночников. Серия — это сколько дней подряд человек закрыл хотя бы одну задачу. Считалась она по date(completed_at) при соединении с базой в UTC. Закрываешь последнюю задачу в 00:30 — отметка уходит в следующие сутки, а вчерашние остаются пустыми. Серия обнуляется, хотя человек ничего не пропустил.
+
+Бот желал доброго утра в четыре часа дня. Утренняя сводка была поставлена на 06:00 UTC — «примерно девять по Москве». Для Владивостока это четыре часа дня, для Калининграда восемь утра.
+
+«Завтра в 18:00» из Telegram уезжало на три часа. В веб-интерфейсе пояс в парсер передавался, а бот вызывал ту же функцию без него. Значением по умолчанию там стоял UTC.
+
+Общее у всех четырёх одно: программа знала, который час на сервере, и не знала, который час у человека.
+
+
+═══ H2: Пояс — это не параметр функции, а свойство пользователя ═══
+
+
+Первая версия (та, из прошлой статьи) передавала имя пояса из браузера вместе с текстом задачи. Для парсера этого хватало, но как модель это неверно: пояс не относится к одной операции, он относится к человеку. Его нужно где-то хранить.
+
+Колонка получилась такая:
+
+`python
+timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+timezone_auto: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+`
+
+Два решения, которые я бы выделил.
+
+Хранится имя, а не смещение. Соблазн записать +03:00 большой — это одно число, с ним удобно считать. Но смещение меняется: в половине мира дважды в год, а иногда и по решению правительства — в России часовые пояса переезжали на моей памяти. Имя Europe/Moscow переживает такие изменения, потому что настоящее смещение каждый раз берётся из базы tzdata, которая обновляется вместе с системой.
+
+NULL разрешён и означает «браузер ещё не сказал». Тогда берётся пояс по умолчанию — у меня московский, потому что аудитория в основном российская. Ошибиться на час для Екатеринбурга лучше, чем на три для всех.
+
+Заодно это чинит место, куда пояс никак было не передать. В Telegram Mini App у меня в коде висел комментарий: «TG WebView не сообщает часовой пояс, берём UTC как baseline» — и из-за этого мини-приложение желало доброго утра когда придётся. Теперь ему ничего передавать не надо: пояс лежит в профиле, а прислал его обычный браузер, когда человек заходил с компьютера.
+
+Флаг timezone_auto появился позже, и про него дальше.
+
+
+═══ H2: Один модуль, который знает про день ═══
+
+
+Дальше я завёл app/timezones.py и договорился сам с собой: везде, где в коде появляется слово «день», вызов идёт сюда. Никаких datetime.now(UTC).date() по месту.
+
+Ядро — границы суток:
+
+`python
+def day_bounds(name: str | None, day: date | None = None) -&gt; tuple[datetime, datetime]:
+    """Границы локальных суток в UTC: [начало дня, начало следующего дня)."""
+    zone = zone_of(name)
+    if day is None:
+        day = datetime.now(zone).date()
+    start = datetime.combine(day, time.min, tzinfo=zone)
+    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone)
+    return start.astimezone(UTC), end.astimezone(UTC)
+`
+
+Здесь две вещи сделаны специально.
+
+Возвращается полуинтервал, а не «до 23:59:59». Задача со сроком 23:59:59.5 не попадала никуда: в сегодня уже поздно, в завтра ещё рано. Такие сроки появляются, если время пришло из внешнего календаря.
+
+Конец суток строится от календарной даты, а не прибавлением 24 часов. Это как раз то место, где обычно и появляется ошибка. Сутки не всегда длятся 24 часа: в день перехода на летнее время их 23, при обратном переходе — 25.
+
+Проверяется это тестом, который не зависит от того, когда его запустили:
+
+`python
+def test_day_is_23_hours_when_clocks_move_forward() -&gt; None:
+    """Лондон, 29 марта 2026: в 01:00 стрелки прыгают на 02:00."""
+    start, end = day_bounds("Europe/London", date(2026, 3, 29))
+    assert end - start == timedelta(hours=23)
+    assert end == day_start("Europe/London", date(2026, 3, 30))
+`
+
+Если бы конец суток считался как «начало плюс сутки», он уехал бы на час вперёд и первый час следующего дня попал бы во вчерашний список. Раз в год, на один день. Такое почти невозможно заметить в проде и очень легко закрыть тестом на конкретную дату.
+
+Тут можно возразить: в России часы не переводят с 2014 года, а пользователи у меня в основном российские. Верно — но, во-первых, код общий, и завтра в нём окажется Алматы или Белград. А во-вторых, серия выполненных дней считается по всей истории, и в этой истории переводы часов есть: до 2014-го их переводили и здесь. Заглядывать в такие вещи самому не надо — tzdata знает.
+
+Второй тест — зеркальный, на 25-часовые сутки. Я сначала написал его на Сантьяго 5 апреля, тест упал, и я полез спорить с кодом. Оказалось, спорить надо было с собой: переход там 4 апреля. Это, в общем, и есть главный аргумент за то, чтобы брать даты переходов из tzdata, а не из головы.
+
+
+═══ H2: Самое неочевидное: у задачи два разных вида срока ═══
+
+
+Вот на чём я сначала сделал неправильно.
+
+Я перевёл все сравнения на границы суток пользователя и обрадовался. Потом дописал тест на переезд — и он упал.
+
+Дело в том, что «в 18:00» и «в четверг» — это разные сущности, хотя в базе лежат в одной колонке.
+
+«Позвонить в 18:00» — момент времени. Точка на шкале. Если человек переехал из Москвы в Магадан, момент остался прежним, поменялось только то, как он выглядит на часах. Такой срок обязан ехать вместе с человеком.
+
+«Сдать реферат в четверг» — календарная дата. За ней нет никакого момента. Четверг остаётся четвергом и в Калининграде, и на Камчатке. Такой срок ехать не должен ни при каких обстоятельствах.
+
+В Doday исторически и то и другое лежит в одной колонке due_at с флагом due_date_only. Дата без времени сохраняется как момент внутри этих суток по UTC: парсер кладёт 23:59, форма — полночь. Схему я менять не стал (это живые данные), но правило сравнения развёл:
+
+`python
+def due_before(day: date, tz: str | None) -&gt; ColumnElement[bool]:
+    """Срок раньше начала дня day — с поправкой на два вида срока."""
+    return or_(
+        and_(Task.due_date_only.is_(False), Task.due_at &lt; timezones.day_start(tz, day)),
+        and_(Task.due_date_only.is_(True), Task.due_at &lt; timezones.floating_start(day)),
+    )
+`
+
+day_start переводит начало суток в UTC через пояс пользователя, floating_start — просто берёт полночь UTC. Момент сравнивается по поясу, календарная дата — как чистая дата.
+
+Если этого не сделать, получается красивая катастрофа: человек переезжает во Владивосток, и все дедлайны «на день» разом сдвигаются на сутки. Причём в базе ничего не менялось, поэтому искать такое вы будете долго.
+
+Два теста, которые держат это разделение:
+
+`python
+def test_timed_deadline_moves_with_the_person() -&gt; None:
+    moment = datetime(2026, 9, 17, 22, 0, tzinfo=UTC)
+    assert due_day(moment, date_only=False, tz="UTC") == date(2026, 9, 17)
+    assert due_day(moment, date_only=False, tz="Europe/Moscow") == date(2026, 9, 18)
+
+def test_date_only_deadline_does_not_move() -&gt; None:
+    thursday = datetime(2026, 9, 17, 23, 59, tzinfo=UTC)
+    for tz in ("UTC", "Europe/Moscow", "Asia/Kamchatka", "America/Los_Angeles"):
+        assert due_day(thursday, date_only=True, tz=tz) == date(2026, 9, 17)
+`
+
+Если вы только проектируете схему — храните это в двух колонках, due_date и due_at. Флаг работает, но каждый, кто придёт в код после вас, будет об это спотыкаться.
+
+
+═══ H2: Postgres: как не потерять индекс на ровном месте ═══
+
+
+Дни считались не только в Python, но и в запросах — «сколько закрыто сегодня», «дни для тепловой карты». Везде стояло func.date(Task.completed_at), а соединение с базой живёт в UTC, поэтому и дата получалась в UTC.
+
+Первым порывом было заменить это на date(completed_at AT TIME ZONE 'Europe/Moscow'). Работает, но у такого сравнения есть неприятное свойство: функция навешана на колонку, и обычный индекс по completed_at для неё бесполезен — база читает всё подряд.
+
+Поэтому там, где нужен диапазон, сравнивается сама колонка с двумя константами:
+
+`python
+day_start, day_end = timezones.day_bounds(user.timezone, today_date)
+...
+Task.completed_at &gt;= day_start,
+Task.completed_at &lt; day_end,
+`
+
+Границы считает Python, база просто сравнивает значения и спокойно берёт индекс.
+
+Перевод в поясе остался только там, где он действительно нужен — в группировке по дням:
+
+`python
+def local_date_sql(column, name):
+    return func.date(func.timezone(normalize(name), column))
+`
+
+Тут выбора нет: дней много, и раскладывать их по корзинам должна база. Приятно, что Postgres пользуется той же базой tzdata, что и Python, так что расхождений между тем, что посчитала база, и тем, что посчитал код, не возникает.
+
+
+═══ H2: Как пояс доезжает до шаблонов ═══
+
+
+Тут я чуть не сделал грязно.
+
+Сервисы получают пояс явным аргументом — это правильно, потому что зовут их не только из HTTP, но и из бота, и из крона, где никакого «текущего пользователя» нет:
+
+`python
+async def list_today(session, user_id, *, tz: str | None = None) -&gt; list[Task]: ...
+`
+
+А вот шаблонным функциям — тем, что рисуют на строке задачи «Сегодня», «Завтра» или красят просроченное, — аргумент прокинуть некуда. Они вызываются из вложенных партиалов, которые подключаются из полусотни мест. Прокидывать пояс через каждый {% include %} — значит однажды где-нибудь его забыть и потом ловить одну строку, которая покрашена не так, как соседние.
+
+Для них пояс кладётся в контекст запроса ровно один раз, там, где пользователь и так загружается:
+
+`python
+APP/AUTH/DEPS.PY
+
+timezones.use(user.timezone)
+`
+
+Внутри — обычный ContextVar. У каждого запроса свой контекст, потому что asyncio копирует его при создании задачи, так что чужой пояс сюда не протечёт.
+
+Граница получилась такая: неявный пояс живёт только в слое отображения, всё, что ходит в базу, принимает его параметром. Правило простое и, главное, его видно в коде: если в сервисе появился timezones.current() — что-то пошло не туда.
+
+Кстати, ровно этот же механизм пригодился в неожиданном месте. Есть страница, где родитель по ссылке смотрит прогресс ребёнка. «Сегодня» там — сегодня у ребёнка, а не у родителя, даже если они в разных поясах. Одна строка timezones.use(child.timezone) — и все подписи на странице встали в детский день.
+
+
+═══ H2: Автоопределение: браузер знает, спрашивать не надо ═══
+
+
+Пояс мог бы быть настройкой. Но настройку, которую надо найти и выставить, не выставляет никто.
+
+Браузер знает пояс точно:
+
+`javascript
+Intl.DateTimeFormat().resolvedOptions().timeZone  // "Europe/Moscow"
+`
+
+Каждая страница сравнивает это значение с сохранённым и, если они разошлись, отправляет новое:
+
+`javascript
+if (!auto || zone === known) return;
+fetch('/api/profile/timezone', {method: 'POST', body: body, credentials: 'same-origin'})
+`
+
+Три мелочи, которые делают это приличным:
+
+• запрос уходит только при несовпадении. Обычная загрузка страницы не делает лишнего похода на сервер;
+• переезд подхватывается сам. Человек прилетел в другой город, открыл приложение — «Сегодня» уже правильное. Ничего настраивать не надо, уведомлять тоже не надо;
+• строка проверяется на сервере. Прилететь в это поле может что угодно, поэтому имя сверяется с базой tzdata, а неизвестное отвергается с 422.
+
+И один случай, который я сначала не учёл: человек может выбрать пояс руками. У того, кто живёт на два города или работает по чужому расписанию, своё мнение о том, где у него день, и перебивать его автоматикой нельзя. Для этого и нужен timezone_auto: после ручного выбора браузер молчит, пока в настройках не вернут «определять автоматически».
+
+
+═══ H2: Дайджест: крон раз в сутки не бывает утренним ═══
+
+
+Утреннее письмо отправлял крон, который срабатывал раз в день и рассылал всем сразу. Это не чинится настройкой времени крона: в Москве в этот момент утро, во Владивостоке день, в Калининграде ночь.
+
+Правильный вариант — наоборот: крон приходит раз в час, а письмо получает тот, у кого сейчас семь утра по его часам.
+
+`python
+local_now = now.astimezone(timezones.zone_of(user.timezone))
+if local_now.hour != hour:
+    counters["skipped_not_morning"] += 1
+    continue
+last = user.morning_digest_last_sent_at
+if last is not None and last &gt;= timezones.day_start(user.timezone, local_now.date()):
+    counters["skipped_already"] += 1
+    continue
+`
+
+Две детали. Первая: защита от повтора сравнивается с началом суток пользователя, а не с полуночью UTC. Вторая: отбирать кандидатов запросом «у кого сейчас семь утра» не получится — пояс лежит строкой, и считать это в SQL неудобно. Поэтому в базе стоит грубый предфильтр («кому не отправляли последние двенадцать часов»), а точная проверка идёт в Python, уже зная пояс каждого. Пользователей с включённым дайджестом немного, так что это честнее, чем городить хитрый запрос.
+
+Тем же способом чинится и утренняя сводка в боте: задание крутится раз в час и забирает тех, у кого сейчас девять. Там понадобилась отдельная отметка о последней отправке — иначе перезапуск бота внутри того же часа присылал бы человеку второе «доброе утро».
+
+
+═══ H2: Заодно нашлись три копии одной серии ═══
+
+
+Пока я ходил по коду и менял datetime.now(UTC).date(), обнаружилось, что серия выполненных дней считается в трёх местах: в сервисе статистики, в отдельном эндпоинте для значка в шапке и в достижениях. Три реализации, написанные в разное время.
+
+Логика совпадала не полностью. Значок в шапке смотрел на историю за последние 400 дней, страница статистики — за всё время. Текущая серия от этого не менялась, а вот «лучшая серия» у одного и того же человека могла быть разной в двух местах на одном экране. Я это видел и до сих пор считал, что мне кажется.
+
+Теперь функция одна, а два других места её зовут. Тест, который держит это:
+
+`python
+badge = await streak_summary(db_session, user.id, tz=user.timezone)
+page = await compute_user_stats(db_session, user.id, tz=user.timezone)
+assert badge["current"] == page["current_streak"]
+`
+
+Там же вскрылась ещё одна мелочь, которая мне понравилась. Есть достижение «жаворонок»: закрыть пять задач до девяти утра. Час брался прямо из отметки времени, то есть по UTC, — значит, на самом деле оно выдавалось за задачи, закрытые до полудня по Москве. Ровно наоборот работал «ночной филин»: порог 22:00 UTC — это час ночи. Оба достижения годами выдавались не тем людям, и пожаловаться на это, конечно, никто не мог: как ты докажешь, что не жаворонок.
+
+Всё это не про часовые пояса напрямую, но нашлось ровно потому, что я пошёл править все места, а не одно.
+
+
+═══ H2: Как это тестировать и не сойти с ума ═══
+
+
+Главное правило: тест не должен зависеть от того, когда его запустили. Иначе половина сломается дважды в год, а ещё одна — когда прогон случайно попадёт на полночь.
+
+Поэтому везде, где можно, задаются конкретная дата и конкретный пояс. А там, где всё-таки нужно «сейчас», граничное время берётся не константой, а у самого модуля:
+
+`python
+task.completed_at = timezones.day_end("Europe/Moscow", timezones.today_in("Europe/Moscow"))
+task.completed_at -= timedelta(minutes=30)
+`
+
+Это половина двенадцатого ночи по Москве в любой день года, независимо от того, когда гоняется тест.
+
+Набор случаев, который я бы советовал прогнать на своём проекте:
+
+• несколько минут до и после полуночи в поясе пользователя;
+• сервер в UTC, пользователь восточнее и западнее Гринвича;
+• день перехода на летнее время в обе стороны (23 и 25 часов);
+• пользователь сменил пояс: что стало с задачей на время и что — с задачей на дату;
+• границы недели и месяца, а не только суток;
+• рассылка, которая должна приходить утром;
+• тот же код, вызванный не из HTTP — из бота, крона, консольной команды.
+
+
+═══ H2: Что в итоге ═══
+
+
+Разбор строки «завтра в 18:00» был верхушкой. Настоящая работа началась там, где я перестал чинить функции по одной и завёл одно место, которое знает, что такое день.
+
+Если формулировать коротко, правил три:
+
+1. В базе — UTC, на экране — пояс пользователя, и границы суток считаются только по нему.
+2. Момент времени и календарная дата — разные вещи. Первый едет за человеком, вторая не едет никогда.
+3. Пояс должен приезжать сам. Настройку, которую надо искать, никто не выставит.
+
+Код проекта открыт: github.com/SwairIt/doday (https://github.com/SwairIt/doday). Сам проект — getdoday.ru (https://getdoday.ru/), это планировщик для учёбы: задачи, расписание, домашка.
+
+Код и эту статью я готовил в паре с ИИ-агентом: он помогал собирать граничные случаи и проверять формулировки, решения и тесты я проверял на коде проекта.
+
+Ярослав Боев.
+
+Спасибо, что дочитали.
+</textarea>
+<button onclick="copyPlainText()" style="margin-top: 0.6em; padding: 0.5em 1em; border-radius: 4px; border: 1px solid #1a73e8; background: white; color: #1a73e8; cursor: pointer; font-weight: 600;">📋 Скопировать plain text</button>
+</details>
+
+<details style="margin-top: 1em; background: white; padding: 1em 1.5em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+<summary style="cursor: pointer; font-weight: 600; color: #666;">Предпросмотр всего поста как одной статьи</summary>
+<article class="article" id="article" style="margin-top: 1em;">
+<h1>Я починил часовые пояса в одной функции и решил, что закончил. Их было двадцать</h1>
+<hr />
+<p>В конце августа я выложил статью про то, как разбирал строку «Сдать реферат завтра в 18:00». Там был честный баг: парсер брал сегодняшнюю дату по UTC, поэтому около полуночи «завтра» получалось не тем завтра. Я передал в парсер часовой пояс, написал тест с фиксированным временем, порадовался и закрыл вкладку.</p>
+<p>Потом я открыл своё же приложение вечером, около полуночи, и увидел, что задача на час ночи понедельника лежит в воскресном списке.</p>
+<p>Парсер тут был уже ни при чём. Он-то честно посчитал момент. Просто в остальном приложении «день» по-прежнему считался в UTC — в двух десятках мест, каждое со своей копией одной и той же арифметики.</p>
+<p>Это статья про то, как я приводил это в порядок: что оказалось неочевидным, где я сначала сделал неправильно, и какие тесты имело смысл написать.</p>
+<h2>Как это выглядело для человека</h2>
+<p>Симптомы выглядели как разные баги, а причина у них была одна.</p>
+<p><strong>Список «Сегодня» заканчивался в три часа ночи.</strong> Сутки считались так:</p>
+<pre><code class="language-python">now = datetime.now(UTC)
+tomorrow = datetime(now.year, now.month, now.day, tzinfo=UTC) + timedelta(days=1)
+</code></pre>
+<p>Для Москвы граница «завтра» приходилась на 03:00 по местному времени. Задача, поставленная на 01:00 понедельника, была «ещё воскресной»: по UTC в этот момент действительно воскресенье, 22:00.</p>
+<p><strong>Серия выполненных дней рвалась у полуночников.</strong> Серия — это сколько дней подряд человек закрыл хотя бы одну задачу. Считалась она по <code>date(completed_at)</code> при соединении с базой в UTC. Закрываешь последнюю задачу в 00:30 — отметка уходит в следующие сутки, а вчерашние остаются пустыми. Серия обнуляется, хотя человек ничего не пропустил.</p>
+<p><strong>Бот желал доброго утра в четыре часа дня.</strong> Утренняя сводка была поставлена на 06:00 UTC — «примерно девять по Москве». Для Владивостока это четыре часа дня, для Калининграда восемь утра.</p>
+<p><strong>«Завтра в 18:00» из Telegram уезжало на три часа.</strong> В веб-интерфейсе пояс в парсер передавался, а бот вызывал ту же функцию без него. Значением по умолчанию там стоял UTC.</p>
+<p>Общее у всех четырёх одно: программа знала, который час на сервере, и не знала, который час у человека.</p>
+<h2>Пояс — это не параметр функции, а свойство пользователя</h2>
+<p>Первая версия (та, из прошлой статьи) передавала имя пояса из браузера вместе с текстом задачи. Для парсера этого хватало, но как модель это неверно: пояс не относится к одной операции, он относится к человеку. Его нужно где-то хранить.</p>
+<p>Колонка получилась такая:</p>
+<pre><code class="language-python">timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+timezone_auto: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=&quot;true&quot;)
+</code></pre>
+<p>Два решения, которые я бы выделил.</p>
+<p><strong>Хранится имя, а не смещение.</strong> Соблазн записать <code>+03:00</code> большой — это одно число, с ним удобно считать. Но смещение меняется: в половине мира дважды в год, а иногда и по решению правительства — в России часовые пояса переезжали на моей памяти. Имя <code>Europe/Moscow</code> переживает такие изменения, потому что настоящее смещение каждый раз берётся из базы tzdata, которая обновляется вместе с системой.</p>
+<p><strong><code>NULL</code> разрешён и означает «браузер ещё не сказал».</strong> Тогда берётся пояс по умолчанию — у меня московский, потому что аудитория в основном российская. Ошибиться на час для Екатеринбурга лучше, чем на три для всех.</p>
+<p>Заодно это чинит место, куда пояс никак было не передать. В Telegram Mini App у меня в коде висел комментарий: «TG WebView не сообщает часовой пояс, берём UTC как baseline» — и из-за этого мини-приложение желало доброго утра когда придётся. Теперь ему ничего передавать не надо: пояс лежит в профиле, а прислал его обычный браузер, когда человек заходил с компьютера.</p>
+<p>Флаг <code>timezone_auto</code> появился позже, и про него дальше.</p>
+<h2>Один модуль, который знает про день</h2>
+<p>Дальше я завёл <code>app/timezones.py</code> и договорился сам с собой: везде, где в коде появляется слово «день», вызов идёт сюда. Никаких <code>datetime.now(UTC).date()</code> по месту.</p>
+<p>Ядро — границы суток:</p>
+<pre><code class="language-python">def day_bounds(name: str | None, day: date | None = None) -&gt; tuple[datetime, datetime]:
+    &quot;&quot;&quot;Границы локальных суток в UTC: [начало дня, начало следующего дня).&quot;&quot;&quot;
+    zone = zone_of(name)
+    if day is None:
+        day = datetime.now(zone).date()
+    start = datetime.combine(day, time.min, tzinfo=zone)
+    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone)
+    return start.astimezone(UTC), end.astimezone(UTC)
+</code></pre>
+<p>Здесь две вещи сделаны специально.</p>
+<p><strong>Возвращается полуинтервал, а не «до 23:59:59».</strong> Задача со сроком 23:59:59.5 не попадала никуда: в сегодня уже поздно, в завтра ещё рано. Такие сроки появляются, если время пришло из внешнего календаря.</p>
+<p><strong>Конец суток строится от календарной даты, а не прибавлением 24 часов.</strong> Это как раз то место, где обычно и появляется ошибка. Сутки не всегда длятся 24 часа: в день перехода на летнее время их 23, при обратном переходе — 25.</p>
+<p>Проверяется это тестом, который не зависит от того, когда его запустили:</p>
+<pre><code class="language-python">def test_day_is_23_hours_when_clocks_move_forward() -&gt; None:
+    &quot;&quot;&quot;Лондон, 29 марта 2026: в 01:00 стрелки прыгают на 02:00.&quot;&quot;&quot;
+    start, end = day_bounds(&quot;Europe/London&quot;, date(2026, 3, 29))
+    assert end - start == timedelta(hours=23)
+    assert end == day_start(&quot;Europe/London&quot;, date(2026, 3, 30))
+</code></pre>
+<p>Если бы конец суток считался как «начало плюс сутки», он уехал бы на час вперёд и первый час следующего дня попал бы во вчерашний список. Раз в год, на один день. Такое почти невозможно заметить в проде и очень легко закрыть тестом на конкретную дату.</p>
+<p>Тут можно возразить: в России часы не переводят с 2014 года, а пользователи у меня в основном российские. Верно — но, во-первых, код общий, и завтра в нём окажется Алматы или Белград. А во-вторых, серия выполненных дней считается по всей истории, и в этой истории переводы часов есть: до 2014-го их переводили и здесь. Заглядывать в такие вещи самому не надо — tzdata знает.</p>
+<p>Второй тест — зеркальный, на 25-часовые сутки. Я сначала написал его на Сантьяго 5 апреля, тест упал, и я полез спорить с кодом. Оказалось, спорить надо было с собой: переход там 4 апреля. Это, в общем, и есть главный аргумент за то, чтобы брать даты переходов из tzdata, а не из головы.</p>
+<h2>Самое неочевидное: у задачи два разных вида срока</h2>
+<p>Вот на чём я сначала сделал неправильно.</p>
+<p>Я перевёл все сравнения на границы суток пользователя и обрадовался. Потом дописал тест на переезд — и он упал.</p>
+<p>Дело в том, что «в 18:00» и «в четверг» — это разные сущности, хотя в базе лежат в одной колонке.</p>
+<p><strong>«Позвонить в 18:00» — момент времени.</strong> Точка на шкале. Если человек переехал из Москвы в Магадан, момент остался прежним, поменялось только то, как он выглядит на часах. Такой срок обязан ехать вместе с человеком.</p>
+<p><strong>«Сдать реферат в четверг» — календарная дата.</strong> За ней нет никакого момента. Четверг остаётся четвергом и в Калининграде, и на Камчатке. Такой срок ехать не должен ни при каких обстоятельствах.</p>
+<p>В Doday исторически и то и другое лежит в одной колонке <code>due_at</code> с флагом <code>due_date_only</code>. Дата без времени сохраняется как момент внутри этих суток по UTC: парсер кладёт 23:59, форма — полночь. Схему я менять не стал (это живые данные), но правило сравнения развёл:</p>
+<pre><code class="language-python">def due_before(day: date, tz: str | None) -&gt; ColumnElement[bool]:
+    &quot;&quot;&quot;Срок раньше начала дня `day` — с поправкой на два вида срока.&quot;&quot;&quot;
+    return or_(
+        and_(Task.due_date_only.is_(False), Task.due_at &lt; timezones.day_start(tz, day)),
+        and_(Task.due_date_only.is_(True), Task.due_at &lt; timezones.floating_start(day)),
+    )
+</code></pre>
+<p><code>day_start</code> переводит начало суток в UTC через пояс пользователя, <code>floating_start</code> — просто берёт полночь UTC. Момент сравнивается по поясу, календарная дата — как чистая дата.</p>
+<p>Если этого не сделать, получается красивая катастрофа: человек переезжает во Владивосток, и все дедлайны «на день» разом сдвигаются на сутки. Причём в базе ничего не менялось, поэтому искать такое вы будете долго.</p>
+<p>Два теста, которые держат это разделение:</p>
+<pre><code class="language-python">def test_timed_deadline_moves_with_the_person() -&gt; None:
+    moment = datetime(2026, 9, 17, 22, 0, tzinfo=UTC)
+    assert due_day(moment, date_only=False, tz=&quot;UTC&quot;) == date(2026, 9, 17)
+    assert due_day(moment, date_only=False, tz=&quot;Europe/Moscow&quot;) == date(2026, 9, 18)
+
+def test_date_only_deadline_does_not_move() -&gt; None:
+    thursday = datetime(2026, 9, 17, 23, 59, tzinfo=UTC)
+    for tz in (&quot;UTC&quot;, &quot;Europe/Moscow&quot;, &quot;Asia/Kamchatka&quot;, &quot;America/Los_Angeles&quot;):
+        assert due_day(thursday, date_only=True, tz=tz) == date(2026, 9, 17)
+</code></pre>
+<p>Если вы только проектируете схему — храните это в двух колонках, <code>due_date</code> и <code>due_at</code>. Флаг работает, но каждый, кто придёт в код после вас, будет об это спотыкаться.</p>
+<h2>Postgres: как не потерять индекс на ровном месте</h2>
+<p>Дни считались не только в Python, но и в запросах — «сколько закрыто сегодня», «дни для тепловой карты». Везде стояло <code>func.date(Task.completed_at)</code>, а соединение с базой живёт в UTC, поэтому и дата получалась в UTC.</p>
+<p>Первым порывом было заменить это на <code>date(completed_at AT TIME ZONE 'Europe/Moscow')</code>. Работает, но у такого сравнения есть неприятное свойство: функция навешана на колонку, и обычный индекс по <code>completed_at</code> для неё бесполезен — база читает всё подряд.</p>
+<p>Поэтому там, где нужен диапазон, сравнивается сама колонка с двумя константами:</p>
+<pre><code class="language-python">day_start, day_end = timezones.day_bounds(user.timezone, today_date)
+...
+Task.completed_at &gt;= day_start,
+Task.completed_at &lt; day_end,
+</code></pre>
+<p>Границы считает Python, база просто сравнивает значения и спокойно берёт индекс.</p>
+<p>Перевод в поясе остался только там, где он действительно нужен — в группировке по дням:</p>
+<pre><code class="language-python">def local_date_sql(column, name):
+    return func.date(func.timezone(normalize(name), column))
+</code></pre>
+<p>Тут выбора нет: дней много, и раскладывать их по корзинам должна база. Приятно, что Postgres пользуется той же базой tzdata, что и Python, так что расхождений между тем, что посчитала база, и тем, что посчитал код, не возникает.</p>
+<h2>Как пояс доезжает до шаблонов</h2>
+<p>Тут я чуть не сделал грязно.</p>
+<p>Сервисы получают пояс явным аргументом — это правильно, потому что зовут их не только из HTTP, но и из бота, и из крона, где никакого «текущего пользователя» нет:</p>
+<pre><code class="language-python">async def list_today(session, user_id, *, tz: str | None = None) -&gt; list[Task]: ...
+</code></pre>
+<p>А вот шаблонным функциям — тем, что рисуют на строке задачи «Сегодня», «Завтра» или красят просроченное, — аргумент прокинуть некуда. Они вызываются из вложенных партиалов, которые подключаются из полусотни мест. Прокидывать пояс через каждый <code>{% include %}</code> — значит однажды где-нибудь его забыть и потом ловить одну строку, которая покрашена не так, как соседние.</p>
+<p>Для них пояс кладётся в контекст запроса ровно один раз, там, где пользователь и так загружается:</p>
+<pre><code class="language-python"># app/auth/deps.py
+timezones.use(user.timezone)
+</code></pre>
+<p>Внутри — обычный <code>ContextVar</code>. У каждого запроса свой контекст, потому что asyncio копирует его при создании задачи, так что чужой пояс сюда не протечёт.</p>
+<p>Граница получилась такая: неявный пояс живёт только в слое отображения, всё, что ходит в базу, принимает его параметром. Правило простое и, главное, его видно в коде: если в сервисе появился <code>timezones.current()</code> — что-то пошло не туда.</p>
+<p>Кстати, ровно этот же механизм пригодился в неожиданном месте. Есть страница, где родитель по ссылке смотрит прогресс ребёнка. «Сегодня» там — сегодня у ребёнка, а не у родителя, даже если они в разных поясах. Одна строка <code>timezones.use(child.timezone)</code> — и все подписи на странице встали в детский день.</p>
+<h2>Автоопределение: браузер знает, спрашивать не надо</h2>
+<p>Пояс мог бы быть настройкой. Но настройку, которую надо найти и выставить, не выставляет никто.</p>
+<p>Браузер знает пояс точно:</p>
+<pre><code class="language-javascript">Intl.DateTimeFormat().resolvedOptions().timeZone  // &quot;Europe/Moscow&quot;
+</code></pre>
+<p>Каждая страница сравнивает это значение с сохранённым и, если они разошлись, отправляет новое:</p>
+<pre><code class="language-javascript">if (!auto || zone === known) return;
+fetch('/api/profile/timezone', {method: 'POST', body: body, credentials: 'same-origin'})
+</code></pre>
+<p>Три мелочи, которые делают это приличным:</p>
+<ul>
+<li><strong>запрос уходит только при несовпадении.</strong> Обычная загрузка страницы не делает лишнего похода на сервер;</li>
+<li><strong>переезд подхватывается сам.</strong> Человек прилетел в другой город, открыл приложение — «Сегодня» уже правильное. Ничего настраивать не надо, уведомлять тоже не надо;</li>
+<li><strong>строка проверяется на сервере.</strong> Прилететь в это поле может что угодно, поэтому имя сверяется с базой tzdata, а неизвестное отвергается с 422.</li>
+</ul>
+<p>И один случай, который я сначала не учёл: человек может выбрать пояс руками. У того, кто живёт на два города или работает по чужому расписанию, своё мнение о том, где у него день, и перебивать его автоматикой нельзя. Для этого и нужен <code>timezone_auto</code>: после ручного выбора браузер молчит, пока в настройках не вернут «определять автоматически».</p>
+<h2>Дайджест: крон раз в сутки не бывает утренним</h2>
+<p>Утреннее письмо отправлял крон, который срабатывал раз в день и рассылал всем сразу. Это не чинится настройкой времени крона: в Москве в этот момент утро, во Владивостоке день, в Калининграде ночь.</p>
+<p>Правильный вариант — наоборот: крон приходит <strong>раз в час</strong>, а письмо получает тот, у кого сейчас семь утра по его часам.</p>
+<pre><code class="language-python">local_now = now.astimezone(timezones.zone_of(user.timezone))
+if local_now.hour != hour:
+    counters[&quot;skipped_not_morning&quot;] += 1
+    continue
+last = user.morning_digest_last_sent_at
+if last is not None and last &gt;= timezones.day_start(user.timezone, local_now.date()):
+    counters[&quot;skipped_already&quot;] += 1
+    continue
+</code></pre>
+<p>Две детали. Первая: защита от повтора сравнивается с началом суток <strong>пользователя</strong>, а не с полуночью UTC. Вторая: отбирать кандидатов запросом «у кого сейчас семь утра» не получится — пояс лежит строкой, и считать это в SQL неудобно. Поэтому в базе стоит грубый предфильтр («кому не отправляли последние двенадцать часов»), а точная проверка идёт в Python, уже зная пояс каждого. Пользователей с включённым дайджестом немного, так что это честнее, чем городить хитрый запрос.</p>
+<p>Тем же способом чинится и утренняя сводка в боте: задание крутится раз в час и забирает тех, у кого сейчас девять. Там понадобилась отдельная отметка о последней отправке — иначе перезапуск бота внутри того же часа присылал бы человеку второе «доброе утро».</p>
+<h2>Заодно нашлись три копии одной серии</h2>
+<p>Пока я ходил по коду и менял <code>datetime.now(UTC).date()</code>, обнаружилось, что серия выполненных дней считается в трёх местах: в сервисе статистики, в отдельном эндпоинте для значка в шапке и в достижениях. Три реализации, написанные в разное время.</p>
+<p>Логика совпадала не полностью. Значок в шапке смотрел на историю за последние 400 дней, страница статистики — за всё время. Текущая серия от этого не менялась, а вот «лучшая серия» у одного и того же человека могла быть разной в двух местах на одном экране. Я это видел и до сих пор считал, что мне кажется.</p>
+<p>Теперь функция одна, а два других места её зовут. Тест, который держит это:</p>
+<pre><code class="language-python">badge = await streak_summary(db_session, user.id, tz=user.timezone)
+page = await compute_user_stats(db_session, user.id, tz=user.timezone)
+assert badge[&quot;current&quot;] == page[&quot;current_streak&quot;]
+</code></pre>
+<p>Там же вскрылась ещё одна мелочь, которая мне понравилась. Есть достижение «жаворонок»: закрыть пять задач до девяти утра. Час брался прямо из отметки времени, то есть по UTC, — значит, на самом деле оно выдавалось за задачи, закрытые до полудня по Москве. Ровно наоборот работал «ночной филин»: порог 22:00 UTC — это час ночи. Оба достижения годами выдавались не тем людям, и пожаловаться на это, конечно, никто не мог: как ты докажешь, что не жаворонок.</p>
+<p>Всё это не про часовые пояса напрямую, но нашлось ровно потому, что я пошёл править все места, а не одно.</p>
+<h2>Как это тестировать и не сойти с ума</h2>
+<p>Главное правило: <strong>тест не должен зависеть от того, когда его запустили.</strong> Иначе половина сломается дважды в год, а ещё одна — когда прогон случайно попадёт на полночь.</p>
+<p>Поэтому везде, где можно, задаются конкретная дата и конкретный пояс. А там, где всё-таки нужно «сейчас», граничное время берётся не константой, а у самого модуля:</p>
+<pre><code class="language-python">task.completed_at = timezones.day_end(&quot;Europe/Moscow&quot;, timezones.today_in(&quot;Europe/Moscow&quot;))
+task.completed_at -= timedelta(minutes=30)
+</code></pre>
+<p>Это половина двенадцатого ночи по Москве в любой день года, независимо от того, когда гоняется тест.</p>
+<p>Набор случаев, который я бы советовал прогнать на своём проекте:</p>
+<ul>
+<li>несколько минут до и после полуночи в поясе пользователя;</li>
+<li>сервер в UTC, пользователь восточнее и западнее Гринвича;</li>
+<li>день перехода на летнее время в обе стороны (23 и 25 часов);</li>
+<li>пользователь сменил пояс: что стало с задачей на время и что — с задачей на дату;</li>
+<li>границы недели и месяца, а не только суток;</li>
+<li>рассылка, которая должна приходить утром;</li>
+<li>тот же код, вызванный не из HTTP — из бота, крона, консольной команды.</li>
+</ul>
+<h2>Что в итоге</h2>
+<p>Разбор строки «завтра в 18:00» был верхушкой. Настоящая работа началась там, где я перестал чинить функции по одной и завёл одно место, которое знает, что такое день.</p>
+<p>Если формулировать коротко, правил три:</p>
+<ol>
+<li><strong>В базе — UTC, на экране — пояс пользователя, и границы суток считаются только по нему.</strong></li>
+<li><strong>Момент времени и календарная дата — разные вещи.</strong> Первый едет за человеком, вторая не едет никогда.</li>
+<li><strong>Пояс должен приезжать сам.</strong> Настройку, которую надо искать, никто не выставит.</li>
+</ol>
+<p>Код проекта открыт: <a href="https://github.com/SwairIt/doday">github.com/SwairIt/doday</a>. Сам проект — <a href="https://getdoday.ru/">getdoday.ru</a>, это планировщик для учёбы: задачи, расписание, домашка.</p>
+<p>Код и эту статью я готовил в паре с ИИ-агентом: он помогал собирать граничные случаи и проверять формулировки, решения и тесты я проверял на коде проекта.</p>
+<p>Ярослав Боев.</p>
+<p>Спасибо, что дочитали.</p>
+</article>
+</details>
+
+<script>
+async function copyPost() {
+  const article = document.getElementById("article");
+  const html = article.innerHTML;
+  const text = article.innerText;
+  const btn = document.getElementById("copy-btn");
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        })
+      ]);
+    } else {
+      const range = document.createRange();
+      range.selectNode(article);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand("copy");
+      sel.removeAllRanges();
+    }
+    btn.textContent = "✓ Скопировано! Теперь вставь в редактор";
+    btn.classList.add("ok");
+    setTimeout(() => { btn.textContent = "📋 Скопировать пост"; btn.classList.remove("ok"); }, 3000);
+  } catch (e) {
+    alert("Не получилось скопировать автоматически. Выдели текст в белом блоке через Ctrl+A и скопируй Ctrl+C. Ошибка: " + e.message);
+  }
+}
+
+async function copySection(sectionId, btn) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  const html = el.innerHTML;
+  const text = el.innerText;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        })
+      ]);
+    } else {
+      const range = document.createRange();
+      range.selectNode(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand("copy");
+      sel.removeAllRanges();
+    }
+    const origText = btn.textContent;
+    btn.textContent = "✓ Готово";
+    btn.classList.add("ok");
+    setTimeout(() => { btn.textContent = origText; btn.classList.remove("ok"); }, 2500);
+  } catch (e) {
+    alert("Не получилось. Выдели текст руками через Ctrl+A в блоке выше. Ошибка: " + e.message);
+  }
+}
+
+async function copyPlainText() {
+  const ta = document.getElementById("plain-textarea");
+  ta.select();
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(ta.value);
+    } else {
+      document.execCommand("copy");
+    }
+    alert("Plain text скопирован в буфер. Вставь в редактор Хабр.");
+  } catch (e) {
+    alert("Не получилось. Ошибка: " + e.message);
+  }
+}
+</script>
+</body></html>
