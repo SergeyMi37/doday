@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.auth.models import User
 from app.db import get_session
 
@@ -28,6 +29,10 @@ async def get_current_user(request: Request, session: DbSession) -> User | None:
     if int(request.session.get("epoch", 0)) != user.session_epoch:
         request.session.clear()
         return None
+    # Пояс пользователя — на весь оставшийся запрос. Отсюда его берут
+    # шаблонные фильтры («Сегодня», «Завтра», «просрочено»), которым аргумент
+    # прокинуть некуда. Сервисы пояс получают явно, параметром tz.
+    timezones.use(user.timezone)
     return user
 
 

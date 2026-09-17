@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.ai.client import Message
 from app.ai.models import AiMessage, AiUsageDaily
 from app.tasks.models import Task
@@ -46,9 +47,9 @@ class PromptTooLong(Exception):
     """Вопрос длиннее, чем мы готовы отправить."""
 
 
-async def usage_today(session: AsyncSession, user_id: UUID) -> int:
+async def usage_today(session: AsyncSession, user_id: UUID, *, tz: str | None = None) -> int:
     """Сколько запросов пользователь уже сделал сегодня."""
-    today = datetime.now(UTC).date()
+    today = timezones.today_in(tz)
     result = await session.execute(
         select(AiUsageDaily.requests).where(
             AiUsageDaily.user_id == user_id, AiUsageDaily.day == today
@@ -57,14 +58,14 @@ async def usage_today(session: AsyncSession, user_id: UUID) -> int:
     return result.scalar_one_or_none() or 0
 
 
-async def check_and_count(session: AsyncSession, user_id: UUID) -> int:
+async def check_and_count(session: AsyncSession, user_id: UUID, *, tz: str | None = None) -> int:
     """Проверить лимит и сразу занять один запрос.
 
     Инкремент атомарный (INSERT ... ON CONFLICT DO UPDATE) — параллельные
     вкладки не смогут проскочить лимит вдвоём. Возвращает новое значение.
     """
-    today: date = datetime.now(UTC).date()
-    used = await usage_today(session, user_id)
+    today: date = timezones.today_in(tz)
+    used = await usage_today(session, user_id, tz=tz)
     if used >= DAILY_LIMIT:
         raise LimitReached(used, DAILY_LIMIT)
 

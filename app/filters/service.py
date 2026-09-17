@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.tasks.models import Task, TaskPriority
 
 FilterSlug = Literal["overdue", "no-date", "high-priority", "this-week"]
@@ -54,12 +55,14 @@ FILTERS: dict[str, FilterMeta] = {
 }
 
 
-def _filter_conditions(user_id: UUID, slug: str) -> list[ColumnElement[bool]]:
+def _filter_conditions(
+    user_id: UUID, slug: str, tz: str | None = None
+) -> list[ColumnElement[bool]]:
     """Where-conditions shared by list_for_filter and count_for_filter."""
     if slug not in FILTERS:
         raise KeyError(slug)
 
-    today = datetime.now(UTC).date()
+    today = timezones.today_in(tz)
     conds: list[ColumnElement[bool]] = [
         Task.user_id == user_id,
         Task.is_completed.is_(False),
@@ -70,7 +73,7 @@ def _filter_conditions(user_id: UUID, slug: str) -> list[ColumnElement[bool]]:
     ]
 
     if slug == "overdue":
-        start_of_today = datetime(today.year, today.month, today.day, 0, 0, tzinfo=UTC)
+        start_of_today = timezones.day_start(tz, today)
         conds += [Task.due_at.is_not(None), Task.due_at < start_of_today]
     elif slug == "no-date":
         conds.append(Task.due_at.is_(None))
@@ -87,17 +90,21 @@ def _filter_conditions(user_id: UUID, slug: str) -> list[ColumnElement[bool]]:
     return conds
 
 
-async def list_for_filter(session: AsyncSession, user_id: UUID, slug: str) -> list[Task]:
+async def list_for_filter(
+    session: AsyncSession, user_id: UUID, slug: str, *, tz: str | None = None
+) -> list[Task]:
     stmt = (
         select(Task)
-        .where(*_filter_conditions(user_id, slug))
+        .where(*_filter_conditions(user_id, slug, tz))
         .order_by(Task.due_at.nulls_last(), Task.priority, Task.created_at)
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
-async def count_for_filter(session: AsyncSession, user_id: UUID, slug: str) -> int:
+async def count_for_filter(
+    session: AsyncSession, user_id: UUID, slug: str, *, tz: str | None = None
+) -> int:
     """Number of open top-level tasks matching a saved filter (for sidebar badges)."""
-    stmt = select(func.count()).select_from(Task).where(*_filter_conditions(user_id, slug))
+    stmt = select(func.count()).select_from(Task).where(*_filter_conditions(user_id, slug, tz))
     return int((await session.execute(stmt)).scalar_one())

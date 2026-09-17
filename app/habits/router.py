@@ -26,7 +26,7 @@ async def list_endpoint(user: RequiredUser, session: DbSession) -> list[HabitWit
     habits = await list_habits(session, user.id)
     out: list[HabitWithStats] = []
     for h in habits:
-        stats = await stats_for(session, user.id, h.id)
+        stats = await stats_for(session, user.id, h.id, tz=user.timezone)
         out.append(
             HabitWithStats(
                 id=h.id,
@@ -81,10 +81,10 @@ async def checkin_endpoint(
     habit_id: UUID, user: RequiredUser, session: DbSession
 ) -> dict[str, object]:
     try:
-        await check_in(session, user.id, habit_id)
+        await check_in(session, user.id, habit_id, tz=user.timezone)
     except HabitNotFound as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "habit not found") from e
-    return await stats_for(session, user.id, habit_id)
+    return await stats_for(session, user.id, habit_id, tz=user.timezone)
 
 
 @router.delete("/{habit_id}/checkin", status_code=status.HTTP_200_OK)
@@ -92,7 +92,7 @@ async def uncheck_endpoint(
     habit_id: UUID, user: RequiredUser, session: DbSession
 ) -> dict[str, object]:
     try:
-        await uncheck(session, user.id, habit_id)
+        await uncheck(session, user.id, habit_id, tz=user.timezone)
     except HabitNotFound as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "habit not found") from e
-    return await stats_for(session, user.id, habit_id)
+    return await stats_for(session, user.id, habit_id, tz=user.timezone)

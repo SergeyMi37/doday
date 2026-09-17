@@ -28,3 +28,10 @@ class TelegramLink(Base):
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
     linked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Когда ушла последняя утренняя сводка в Telegram. Нужна, потому что
+    # сводка уходит в 9 утра по местному времени: задание крутится
+    # каждый час, и без отметки перезапуск бота внутри того же часа
+    # прислал бы человеку второе «доброе утро».
+    last_digest_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

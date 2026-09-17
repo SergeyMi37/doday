@@ -41,7 +41,10 @@
              showPwd: false,
              capsOn: false,
              {# Введённое возвращается с сервера, чтобы после ошибки не набирать заново. #}
-             email: {{ (form_email or '')|tojson }},
+             {# forceescape обязателен: это значение подставляется внутрь
+                атрибута x-data="...", и обычный tojson закрыл бы его
+                кавычкой на первом же адресе. #}
+             email: {{ (form_email or '')|tojson|forceescape }},
              emailValid: false,
              pwd: '',
              captchaError: false,

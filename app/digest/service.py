@@ -8,7 +8,7 @@ body. `send_morning_digest` ties it together and writes
 is the cron entry-point — iterates over opt-in users and returns a count.
 """
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 from email.message import EmailMessage
 from html import escape
 
@@ -16,9 +16,15 @@ import aiosmtplib
 from sqlalchemy import and_, asc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.auth.models import User
 from app.config import get_settings
 from app.tasks.models import Task
+from app.tasks.service import due_before, due_on_day
+
+# В котором часу по местному времени уходит письмо. Раз в час приходит
+# крон, и каждому пишем ровно тогда, когда у него это утро.
+DIGEST_HOUR = 7
 
 _DIGEST_MOTIVATIONAL = "Полезно начать с того что просрочено — потом дальше будет легче."
 
@@ -26,11 +32,14 @@ _DIGEST_MOTIVATIONAL = "Полезно начать с того что прос�
 async def gather_tasks_for(
     session: AsyncSession, user: User, *, now: datetime | None = None
 ) -> tuple[list[Task], list[Task], list[Task]]:
-    """Return (overdue, today, tomorrow_first_3) for user, sorted by priority+date."""
-    now = now or datetime.now(UTC)
-    today_start = datetime.combine(now.date(), time.min, tzinfo=UTC)
-    tomorrow_start = today_start + timedelta(days=1)
-    after_tomorrow_start = today_start + timedelta(days=2)
+    """Return (overdue, today, tomorrow_first_3) for user, sorted by priority+date.
+
+    Сутки — в поясе получателя: письмо про «сегодня» имеет смысл только
+    в его календаре.
+    """
+    tz = user.timezone
+    today = timezones.local_date_of(now, tz) if now else timezones.today_in(tz)
+    tomorrow_day = today + timedelta(days=1)
 
     base_filter = and_(
         Task.user_id == user.id,
@@ -41,17 +50,17 @@ async def gather_tasks_for(
 
     overdue_stmt = (
         select(Task)
-        .where(base_filter, Task.due_at < today_start)
+        .where(base_filter, due_before(today, tz))
         .order_by(asc(Task.priority), asc(Task.due_at))
     )
     today_stmt = (
         select(Task)
-        .where(base_filter, Task.due_at >= today_start, Task.due_at < tomorrow_start)
+        .where(base_filter, due_on_day(today, tz))
         .order_by(asc(Task.priority), asc(Task.due_at))
     )
     tomorrow_stmt = (
         select(Task)
-        .where(base_filter, Task.due_at >= tomorrow_start, Task.due_at < after_tomorrow_start)
+        .where(base_filter, due_on_day(tomorrow_day, tz))
         .order_by(asc(Task.priority), asc(Task.due_at))
         .limit(3)
     )
@@ -260,7 +269,7 @@ async def send_morning_digest(
         return False
 
     base_url = settings.app_base_url.rstrip("/")
-    today_local = now.date()
+    today_local = timezones.local_date_of(now, user.timezone)
     subject = compose_subject(today_local, total)
     text = compose_text(user, today_local, overdue, today_tasks, tomorrow, base_url=base_url)
     html = compose_html(user, today_local, overdue, today_tasks, tomorrow, base_url=base_url)
@@ -287,24 +296,29 @@ async def send_morning_digest(
 
 
 async def send_morning_digests_for_all_users(
-    session: AsyncSession, *, now: datetime | None = None
+    session: AsyncSession, *, now: datetime | None = None, hour: int = DIGEST_HOUR
 ) -> dict[str, int]:
-    """Cron entry-point. Iterates over opt-in users and sends each digest.
+    """Cron entry-point. Зовётся раз в час; письмо уходит тому, у кого
+    сейчас утро.
 
-    Dedupes by `morning_digest_last_sent_at` >= start of today (UTC) — if the
-    cron fires twice on the same day for any reason, we skip already-sent ones.
+    Раньше крон срабатывал раз в сутки и рассылал всем сразу — в Москве
+    это было утро, во Владивостоке день, в Калининграде ещё ночь.
+    Теперь час проверяется в поясе получателя, а от повторов защищает
+    отметка о последней отправке, сравниваемая с началом его суток.
 
     Returns {sent: N, skipped_already: N, skipped_empty: N, errored: N}.
     """
     now = now or datetime.now(UTC)
-    today_start = datetime.combine(now.date(), time.min, tzinfo=UTC)
 
+    # Грубый предфильтр на стороне базы — точную проверку делаем ниже,
+    # уже зная пояс каждого. Двенадцать часов берём с запасом: сутки
+    # нигде не начинаются дважды за это время.
     stmt = select(User).where(
         User.morning_digest_enabled.is_(True),
         User.email_verified_at.is_not(None),
         or_(
             User.morning_digest_last_sent_at.is_(None),
-            User.morning_digest_last_sent_at < today_start,
+            User.morning_digest_last_sent_at < now - timedelta(hours=12),
         ),
     )
     users = list((await session.execute(stmt)).scalars().all())
@@ -314,6 +328,7 @@ async def send_morning_digests_for_all_users(
         "skipped_already": 0,
         "skipped_empty": 0,
         "skipped_free": 0,
+        "skipped_not_morning": 0,
         "errored": 0,
     }
 
@@ -325,6 +340,14 @@ async def send_morning_digests_for_all_users(
     for user in users:
         if not has_pro_features(user):
             counters["skipped_free"] += 1
+            continue
+        local_now = now.astimezone(timezones.zone_of(user.timezone))
+        if local_now.hour != hour:
+            counters["skipped_not_morning"] += 1
+            continue
+        last = user.morning_digest_last_sent_at
+        if last is not None and last >= timezones.day_start(user.timezone, local_now.date()):
+            counters["skipped_already"] += 1
             continue
         try:
             sent = await send_morning_digest(session, user, now=now)

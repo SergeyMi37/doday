@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from app import timezones
 from app.auth.deps import DbSession, RequiredUser
 from app.auth.models import User
 from app.billing.service import effective_tier
@@ -30,6 +31,7 @@ from app.tasks.service import (
     list_today,
     list_upcoming,
     subtask_counts_for,
+    visible_day,
 )
 from app.views.template_filters import due_label, due_state
 
@@ -127,16 +129,17 @@ async def today_view(
     if has_integration and is_enabled(user, "school"):
         background_tasks.add_task(lazy_sync_stale_integrations, user.id)
 
-    streak_days = await current_streak(session, user.id)
+    streak_days = await current_streak(session, user.id, tz=user.timezone)
 
     projects = await list_projects(session, user.id)
     project_color_map: dict[UUID, str] = {p.id: p.color for p in projects}
     project_name_map: dict[UUID, str] = {p.id: p.name for p in projects}
 
-    tasks = await list_today(session, user.id)
-    today_date = datetime.now(UTC).date()
-    overdue = [t for t in tasks if t.due_at and t.due_at.date() < today_date]
-    today = [t for t in tasks if t.due_at and t.due_at.date() >= today_date]
+    tasks = await list_today(session, user.id, tz=user.timezone)
+    today_date = timezones.today_in(user.timezone)
+    days_of = {t.id: visible_day(t, user.timezone) for t in tasks}
+    overdue = [t for t in tasks if (d := days_of[t.id]) is not None and d < today_date]
+    today = [t for t in tasks if (d := days_of[t.id]) is not None and d >= today_date]
 
     # Assignee avatars for tasks from shared (team) projects only — keeps the
     # avatar off personal tasks (which would just show the viewer's own face).
@@ -149,33 +152,38 @@ async def today_view(
     subtask_counts = await subtask_counts_for(session, user.id, shown_ids)
     comment_count_map = await comment_counts_for(session, shown_ids)
 
+    # Выполнение — это момент времени, поэтому считаем по границам суток
+    # пользователя. Сравнение колонки с константой оставляет запросу индекс,
+    # в отличие от date(completed_at).
+    day_start, day_end = timezones.day_bounds(user.timezone, today_date)
+    week_start = timezones.day_start(
+        user.timezone, today_date - timedelta(days=today_date.weekday())
+    )
     done_today_count_row = await session.execute(
         sa_select(func.count())
         .select_from(Task)
         .where(
             Task.user_id == user.id,
             Task.is_completed.is_(True),
-            Task.completed_at.is_not(None),
-            func.date(Task.completed_at) == today_date,
+            Task.completed_at >= day_start,
+            Task.completed_at < day_end,
         )
     )
     done_today_count = done_today_count_row.scalar_one()
 
-    week_start = today_date - timedelta(days=today_date.weekday())
     done_week_count_row = await session.execute(
         sa_select(func.count())
         .select_from(Task)
         .where(
             Task.user_id == user.id,
             Task.is_completed.is_(True),
-            Task.completed_at.is_not(None),
-            func.date(Task.completed_at) >= week_start,
-            func.date(Task.completed_at) <= today_date,
+            Task.completed_at >= week_start,
+            Task.completed_at < day_end,
         )
     )
     done_week_count = done_week_count_row.scalar_one()
 
-    completed_today = await list_completed_today(session, user.id, limit=10)
+    completed_today = await list_completed_today(session, user.id, limit=10, tz=user.timezone)
 
     return templates.TemplateResponse(
         request,
@@ -330,7 +338,7 @@ async def calendar_view(
     week: str | None = None,
 ) -> HTMLResponse:
     """Calendar in month-grid (default) or week-column layout (?view=week)."""
-    today_date = datetime.now(UTC).date()
+    today_date = timezones.today_in(user.timezone)
     projects = await list_projects(session, user.id)
     project_color_map: dict[UUID, str] = {p.id: p.color for p in projects}
 
@@ -345,13 +353,14 @@ async def calendar_view(
                 anchor = today_date
         monday = anchor - timedelta(days=anchor.weekday())
         sunday = monday + timedelta(days=7)
-        range_start = datetime.combine(monday, datetime.min.time(), tzinfo=UTC)
-        range_end = datetime.combine(sunday, datetime.min.time(), tzinfo=UTC)
-        tasks = await list_in_range(session, user.id, start=range_start, end=range_end)
+        tasks = await list_in_range(
+            session, user.id, first_day=monday, last_day=sunday, tz=user.timezone
+        )
         by_day: dict[date, list[Task]] = defaultdict(list)
         for t in tasks:
-            if t.due_at is not None:
-                by_day[t.due_at.date()].append(t)
+            day = visible_day(t, user.timezone)
+            if day is not None:
+                by_day[day].append(t)
         days = []
         weekday_names = [
             "Понедельник",
@@ -402,14 +411,15 @@ async def calendar_view(
     grid_start = target - timedelta(days=first_weekday)
     grid_end = grid_start + timedelta(days=42)  # 6 weeks
 
-    range_start = datetime.combine(grid_start, datetime.min.time(), tzinfo=UTC)
-    range_end = datetime.combine(grid_end, datetime.min.time(), tzinfo=UTC)
-    tasks = await list_in_range(session, user.id, start=range_start, end=range_end)
+    tasks = await list_in_range(
+        session, user.id, first_day=grid_start, last_day=grid_end, tz=user.timezone
+    )
 
     by_day = defaultdict(list)
     for t in tasks:
-        if t.due_at is not None:
-            by_day[t.due_at.date()].append(t)
+        day = visible_day(t, user.timezone)
+        if day is not None:
+            by_day[day].append(t)
 
     cells = []
     for offset in range(42):
@@ -533,7 +543,7 @@ async def _project_activity_view(
     from app.projects.membership import assignee_map_for_project
 
     cutoff = datetime.now(UTC) - timedelta(days=30)
-    today_date = datetime.now(UTC).date()
+    today_date = timezones.today_in(user.timezone)
     yesterday = today_date - timedelta(days=1)
 
     assignee_map = await assignee_map_for_project(session, project.id)
@@ -626,7 +636,9 @@ async def _project_activity_view(
     grouped: dict[date, list[dict[str, object]]] = defaultdict(list)
     for it in items:
         ts = it["ts"]
-        when = ts.date() if isinstance(ts, datetime) else today_date
+        when = (
+            timezones.local_date_of(ts, user.timezone) if isinstance(ts, datetime) else today_date
+        )
         grouped[when].append(it)
 
     days = []
@@ -672,7 +684,7 @@ async def filter_view(
 
     if slug not in FILTERS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "фильтр не найден")
-    tasks = await list_for_filter(session, user.id, slug)
+    tasks = await list_for_filter(session, user.id, slug, tz=user.timezone)
     projects = await list_projects(session, user.id)
     project_color_map: dict[UUID, str] = {p.id: p.color for p in projects}
     project_name_map: dict[UUID, str] = {p.id: p.name for p in projects}
@@ -695,7 +707,7 @@ async def filter_view(
 async def stats_view(request: Request, user: RequiredUser, session: DbSession) -> HTMLResponse:
     from app.stats.service import compute_user_stats
 
-    stats = await compute_user_stats(session, user.id)
+    stats = await compute_user_stats(session, user.id, tz=user.timezone)
     projects = await list_projects(session, user.id)
     return templates.TemplateResponse(
         request,
@@ -814,7 +826,7 @@ async def activity_view(request: Request, user: RequiredUser, session: DbSession
     from app.comments.models import Comment
 
     cutoff = datetime.now(UTC) - timedelta(days=30)
-    today_date = datetime.now(UTC).date()
+    today_date = timezones.today_in(user.timezone)
     yesterday = today_date - timedelta(days=1)
 
     projects = await list_projects(session, user.id)
@@ -906,7 +918,9 @@ async def activity_view(request: Request, user: RequiredUser, session: DbSession
     grouped: dict[date, list[dict[str, object]]] = defaultdict(list)
     for it in items:
         ts = it["ts"]
-        when = ts.date() if isinstance(ts, datetime) else today_date
+        when = (
+            timezones.local_date_of(ts, user.timezone) if isinstance(ts, datetime) else today_date
+        )
         grouped[when].append(it)
 
     days = []
@@ -997,12 +1011,12 @@ async def label_tasks_view(
 async def done_view(request: Request, user: RequiredUser, session: DbSession) -> HTMLResponse:
     """History of completed tasks, grouped by completion date (newest first)."""
     tasks = await list_completed(session, user.id, limit=300)
-    today_date = datetime.now(UTC).date()
+    today_date = timezones.today_in(user.timezone)
     yesterday = today_date - timedelta(days=1)
 
     grouped: dict[date, list[Task]] = defaultdict(list)
     for t in tasks:
-        when = (t.completed_at or t.updated_at).date()
+        when = timezones.local_date_of(t.completed_at or t.updated_at, user.timezone)
         grouped[when].append(t)
 
     days = []
@@ -1145,6 +1159,10 @@ async def settings_view(request: Request, user: RequiredUser, session: DbSession
             "experimental_state": experimental_state,
             "presets_list": presets_list,
             "beta_free_for_all": beta_active,
+            "timezones_list": timezones.COMMON_TIMEZONES,
+            "current_timezone": timezones.normalize(user.timezone),
+            "timezone_auto": user.timezone_auto,
+            "local_now": timezones.now_in(user.timezone).strftime("%H:%M"),
         },
     )
 
@@ -1250,7 +1268,7 @@ async def school_view(
 
     target_project_ids = {i.target_project_id for i in integrations if i.target_project_id}
     homework_today: list[object] = []
-    today_date = datetime.now(UTC).date()
+    today_date = timezones.today_in(user.timezone)
 
     # Build the WHERE: either project matches a target OR title starts with 📚.
     from sqlalchemy import or_ as sa_or
@@ -1277,7 +1295,7 @@ async def school_view(
                 "id": t.id,
                 "title": t.title,
                 "due_at": t.due_at,
-                "is_today": (t.due_at is not None and t.due_at.date() == today_date),
+                "is_today": visible_day(t, user.timezone) == today_date,
                 "priority": t.priority.value,
             }
         )
@@ -1309,8 +1327,8 @@ async def upcoming_view(request: Request, user: RequiredUser, session: DbSession
     project_color_map: dict[UUID, str] = {p.id: p.color for p in projects}
     project_name_map: dict[UUID, str] = {p.id: p.name for p in projects}
 
-    tasks = await list_upcoming(session, user.id, days=7)
-    today_date = datetime.now(UTC).date()
+    tasks = await list_upcoming(session, user.id, days=7, tz=user.timezone)
+    today_date = timezones.today_in(user.timezone)
 
     # Assignee avatars for shared-project tasks only (see today_view).
     shared_ids = set(await shared_project_ids(session, user.id))
@@ -1324,8 +1342,9 @@ async def upcoming_view(request: Request, user: RequiredUser, session: DbSession
 
     grouped: dict[date, list[Task]] = defaultdict(list)
     for t in tasks:
-        if t.due_at is not None:
-            grouped[t.due_at.date()].append(t)
+        day = visible_day(t, user.timezone)
+        if day is not None:
+            grouped[day].append(t)
 
     days = [
         {
@@ -1417,8 +1436,8 @@ async def simple_today_view(
 ) -> HTMLResponse:
     from app.tasks.service import list_today as _list_today_simple
 
-    tasks = await _list_today_simple(session, user.id)
-    today_date = datetime.now(UTC).date()
+    tasks = await _list_today_simple(session, user.id, tz=user.timezone)
+    today_date = timezones.today_in(user.timezone)
     return templates.TemplateResponse(
         request,
         "simple/today.html",

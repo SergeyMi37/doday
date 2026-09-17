@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from app import timezones
 from app.auth.deps import DbSession, RequiredUser
 from app.auth.models import User
 from app.projects.schemas import (
@@ -96,7 +97,7 @@ async def counts_endpoint(user: RequiredUser, session: DbSession) -> dict[UUID, 
 @router.get("/sidebar-counts")
 async def sidebar_counts_endpoint(user: RequiredUser, session: DbSession) -> dict[str, int]:
     """One-shot counts for sidebar nav badges: inbox / today / upcoming / overdue / trash."""
-    from datetime import UTC, datetime, timedelta
+    from datetime import timedelta
 
     from sqlalchemy import func, select
 
@@ -105,9 +106,9 @@ async def sidebar_counts_endpoint(user: RequiredUser, session: DbSession) -> dic
     from app.tasks.models import Task
 
     inbox = await ensure_inbox(session, user.id)
-    now = datetime.now(UTC)
-    today_end = datetime(now.year, now.month, now.day, 23, 59, 59, tzinfo=UTC)
-    upcoming_end = datetime(now.year, now.month, now.day, tzinfo=UTC) + timedelta(days=8)
+    today = timezones.today_in(user.timezone)
+    today_end = timezones.day_end(user.timezone, today)
+    upcoming_end = timezones.day_start(user.timezone, today + timedelta(days=8))
 
     base = (
         select(func.count())
@@ -155,7 +156,7 @@ async def sidebar_counts_endpoint(user: RequiredUser, session: DbSession) -> dic
                 base.where(
                     Task.is_completed.is_(False),
                     Task.due_at.is_not(None),
-                    Task.due_at < datetime(now.year, now.month, now.day, tzinfo=UTC),
+                    Task.due_at < timezones.day_start(user.timezone, today),
                 )
             )
         ).scalar_one()
@@ -181,9 +182,11 @@ async def sidebar_counts_endpoint(user: RequiredUser, session: DbSession) -> dic
 
     from app.filters.service import count_for_filter
 
-    no_date_count = await count_for_filter(session, user.id, "no-date")
-    high_priority_count = await count_for_filter(session, user.id, "high-priority")
-    this_week_count = await count_for_filter(session, user.id, "this-week")
+    no_date_count = await count_for_filter(session, user.id, "no-date", tz=user.timezone)
+    high_priority_count = await count_for_filter(
+        session, user.id, "high-priority", tz=user.timezone
+    )
+    this_week_count = await count_for_filter(session, user.id, "this-week", tz=user.timezone)
 
     return {
         "inbox": inbox_count,
@@ -207,13 +210,13 @@ async def calendar_markers_endpoint(
 
     Used by the sidebar mini-calendar to dot busy days.
     """
-    from datetime import UTC, datetime, timedelta
+    from datetime import datetime, timedelta
 
     from sqlalchemy import func, select
 
     from app.tasks.models import Task
 
-    today = datetime.now(UTC).date()
+    today = timezones.today_in(user.timezone)
     if month:
         try:
             target = datetime.strptime(month, "%Y-%m").date().replace(day=1)
@@ -222,8 +225,8 @@ async def calendar_markers_endpoint(
     else:
         target = today.replace(day=1)
     next_target = (target.replace(day=28) + timedelta(days=10)).replace(day=1)
-    range_start = datetime(target.year, target.month, 1, tzinfo=UTC)
-    range_end = datetime(next_target.year, next_target.month, 1, tzinfo=UTC)
+    range_start = timezones.day_start(user.timezone, target)
+    range_end = timezones.day_start(user.timezone, next_target)
 
     rows = await session.execute(
         select(func.date(Task.due_at))

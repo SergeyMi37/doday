@@ -1,11 +1,12 @@
 """Mood-tracker business logic — upsert by date, last-N-days summary."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.mood.models import MoodEntry
 
 
@@ -16,10 +17,11 @@ async def upsert_mood(
     on_date: date | None = None,
     score: int,
     note: str | None = None,
+    tz: str | None = None,
 ) -> MoodEntry:
     if not 1 <= score <= 5:
         raise ValueError("score must be in 1..5")
-    target = on_date or datetime.now(UTC).date()
+    target = on_date or timezones.today_in(tz)
     existing = (
         await session.execute(
             select(MoodEntry).where(MoodEntry.user_id == user_id, MoodEntry.mood_date == target)
@@ -38,8 +40,10 @@ async def upsert_mood(
     return entry
 
 
-async def history(session: AsyncSession, user_id: UUID, *, days: int = 30) -> list[MoodEntry]:
-    horizon = datetime.now(UTC).date() - timedelta(days=days)
+async def history(
+    session: AsyncSession, user_id: UUID, *, days: int = 30, tz: str | None = None
+) -> list[MoodEntry]:
+    horizon = timezones.today_in(tz) - timedelta(days=days)
     rows = await session.execute(
         select(MoodEntry)
         .where(MoodEntry.user_id == user_id, MoodEntry.mood_date >= horizon)
@@ -48,8 +52,10 @@ async def history(session: AsyncSession, user_id: UUID, *, days: int = 30) -> li
     return list(rows.scalars().all())
 
 
-async def get_today(session: AsyncSession, user_id: UUID) -> MoodEntry | None:
-    today = datetime.now(UTC).date()
+async def get_today(
+    session: AsyncSession, user_id: UUID, *, tz: str | None = None
+) -> MoodEntry | None:
+    today = timezones.today_in(tz)
     return (
         await session.execute(
             select(MoodEntry).where(MoodEntry.user_id == user_id, MoodEntry.mood_date == today)

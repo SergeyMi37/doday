@@ -14,6 +14,7 @@ import structlog
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.school.crypto import decrypt_token, encrypt_token
 from app.school.models import SchoolIntegration
 from app.school.schemas import PROVIDER_LABELS, IntegrationIn, Provider, SyncResult
@@ -349,9 +350,14 @@ async def _create_tasks_from_payload(
         if isinstance(deadline_raw, str) and deadline_raw:
             try:
                 # Accept both date-only and full ISO timestamps.
-                due_at = datetime.fromisoformat(deadline_raw.replace("Z", "+00:00"))
-                if due_at.tzinfo is None:
-                    due_at = due_at.replace(tzinfo=UTC)
+                parsed = datetime.fromisoformat(deadline_raw.replace("Z", "+00:00"))
+                # Дедлайн домашки — календарная дата, а не момент времени:
+                # «сдать к четвергу» остаётся четвергом, куда бы ученик ни
+                # уехал. Берём день так, как его прислал портал (у aware-даты
+                # .date() считается в её же смещении), и сохраняем по общему
+                # правилу для сроков без времени. Иначе полночь по Москве,
+                # приехавшая как «+03:00», превращалась бы в предыдущий день.
+                due_at = timezones.floating_start(parsed.date())
             except ValueError:
                 due_at = None
         await create_task(

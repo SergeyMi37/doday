@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
+from app import timezones
 from app.auth.deps import CurrentUser, DbSession
 from app.auth.models import User
 from app.config import get_settings
@@ -19,7 +20,14 @@ from app.pomodoro.models import PomodoroSession
 from app.projects.service import create_project, ensure_inbox, list_projects
 from app.quickadd.parser import parse_quick_add
 from app.tasks.models import Task
-from app.tasks.service import create_task, list_completed_today, list_today
+from app.tasks.service import (
+    create_task,
+    due_on_day,
+    list_completed_today,
+    list_today,
+    visible_day,
+    visible_day_sql,
+)
 from app.telegram.models import TelegramLink
 
 router = APIRouter(prefix="/miniapp", tags=["miniapp"])
@@ -188,15 +196,19 @@ async def today(request: Request, user: CurrentUser, session: DbSession) -> Resp
     if user is None:  # pragma: no cover — narrow для mypy
         return RedirectResponse(url="/miniapp/link", status_code=status.HTTP_303_SEE_OTHER)
 
-    now = datetime.now(UTC)
+    # TG WebView не сообщает часовой пояс, и раньше здесь честно стояло
+    # «берём UTC как baseline» — из-за чего «Доброе утро» приходило
+    # ночью. Теперь пояс лежит у пользователя в профиле: его присылает
+    # браузер обычного веба, а мини-апп просто им пользуется.
+    now = timezones.now_in(user.timezone)
     today_date = now.date()
-    # Локальное время юзера приближённо: TG WebView не передаёт TZ, берём UTC
-    # как baseline; +3 за Moscow если хотим, но универсальнее — оставить UTC
     greeting = _greeting_for(user, now.hour)
-    tasks = await list_today(session, user.id)
-    overdue = [t for t in tasks if t.due_at and t.due_at.date() < today_date]
-    today_tasks = [t for t in tasks if t.due_at and t.due_at.date() >= today_date]
+    tasks = await list_today(session, user.id, tz=user.timezone)
+    days_of = {t.id: visible_day(t, user.timezone) for t in tasks}
+    overdue = [t for t in tasks if (d := days_of[t.id]) is not None and d < today_date]
+    today_tasks = [t for t in tasks if (d := days_of[t.id]) is not None and d >= today_date]
 
+    day_start, day_end = timezones.day_bounds(user.timezone, today_date)
     done_today_count = (
         await session.execute(
             select(func.count())
@@ -204,13 +216,13 @@ async def today(request: Request, user: CurrentUser, session: DbSession) -> Resp
             .where(
                 Task.user_id == user.id,
                 Task.is_completed.is_(True),
-                Task.completed_at.is_not(None),
-                func.date(Task.completed_at) == today_date,
+                Task.completed_at >= day_start,
+                Task.completed_at < day_end,
             )
         )
     ).scalar_one()
 
-    completed_today = await list_completed_today(session, user.id, limit=10)
+    completed_today = await list_completed_today(session, user.id, limit=10, tz=user.timezone)
 
     ctx = _ctx(request, user)
     ctx.update(
@@ -269,7 +281,7 @@ async def calendar(
     from datetime import date as date_cls
     from datetime import timedelta
 
-    today_date = datetime.now(UTC).date()
+    today_date = timezones.today_in(user.timezone)
     if date:
         try:
             selected_date = date_cls.fromisoformat(date)
@@ -284,8 +296,6 @@ async def calendar(
     week_names = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
     # Tasks for selected day (and overdue if today is selected)
-    day_start = datetime.combine(selected_date, datetime.min.time(), tzinfo=UTC)
-    day_end = datetime.combine(selected_date, datetime.max.time(), tzinfo=UTC)
     tasks_q = await session.execute(
         select(Task)
         .where(
@@ -293,8 +303,7 @@ async def calendar(
             Task.is_completed.is_(False),
             Task.deleted_at.is_(None),
             Task.due_at.is_not(None),
-            Task.due_at >= day_start,
-            Task.due_at <= day_end,
+            due_on_day(selected_date, user.timezone),
         )
         .order_by(Task.due_at, Task.position)
         .limit(50)
@@ -302,17 +311,18 @@ async def calendar(
     day_tasks = list(tasks_q.scalars().all())
 
     # Counts per week-day for badges in chip-row
+    week_day = visible_day_sql(user.timezone)
     week_counts_q = await session.execute(
-        select(func.date(Task.due_at), func.count())
+        select(week_day, func.count())
         .where(
             Task.user_id == user.id,
             Task.is_completed.is_(False),
             Task.deleted_at.is_(None),
             Task.due_at.is_not(None),
-            func.date(Task.due_at) >= week_start,
-            func.date(Task.due_at) <= week_dates[-1],
+            week_day >= week_start,
+            week_day <= week_dates[-1],
         )
-        .group_by(func.date(Task.due_at))
+        .group_by(week_day)
     )
     counts_map = {row[0]: row[1] for row in week_counts_q.all()}
 
@@ -353,16 +363,16 @@ async def calendar(
     heatmap_start = today_date - timedelta(days=12 * 7 - 1)
     # Adjust to Monday-start of that week.
     heatmap_start_monday = heatmap_start - timedelta(days=heatmap_start.weekday())
+    done_day = timezones.local_date_sql(Task.completed_at, user.timezone)
     heatmap_rows = await session.execute(
-        select(func.date(Task.completed_at), func.count())
+        select(done_day, func.count())
         .where(
             Task.user_id == user.id,
             Task.is_completed.is_(True),
-            Task.completed_at.is_not(None),
-            func.date(Task.completed_at) >= heatmap_start_monday,
-            func.date(Task.completed_at) <= today_date,
+            Task.completed_at >= timezones.day_start(user.timezone, heatmap_start_monday),
+            Task.completed_at < timezones.day_end(user.timezone, today_date),
         )
-        .group_by(func.date(Task.completed_at))
+        .group_by(done_day)
     )
     heatmap_counts = {row[0]: int(row[1]) for row in heatmap_rows.all()}
     # Build 12 weeks × 7 days, oldest → newest, in chunks per week
@@ -410,8 +420,8 @@ async def projects(request: Request, user: CurrentUser, session: DbSession) -> R
 
     project_list = await list_projects(session, user.id)
     # Counts: active + overdue tasks per project
-    today_date = datetime.now(UTC).date()
-    today_end = datetime.combine(today_date, datetime.max.time(), tzinfo=UTC)
+    today_date = timezones.today_in(user.timezone)
+    today_end = timezones.day_end(user.timezone, today_date)
     counts_q = await session.execute(
         select(
             Task.project_id,
@@ -638,9 +648,13 @@ async def api_parse(payload: QuickAddIn, user: CurrentUser) -> JSONResponse:
     if user is None:
         return JSONResponse({"error": "auth_required"}, status_code=401)
     try:
-        parsed = parse_quick_add(payload.text or "", timezone_name=payload.timezone)
+        parsed = parse_quick_add(
+            payload.text or "", timezone_name=timezones.normalize(payload.timezone)
+        )
     except ValueError:
-        parsed = parse_quick_add(payload.text or "")
+        parsed = parse_quick_add(
+            payload.text or "", timezone_name=timezones.normalize(user.timezone)
+        )
     return JSONResponse(
         {
             "title": parsed.title,
@@ -667,9 +681,9 @@ async def api_create_task(
     if not text:
         return JSONResponse({"error": "empty_text"}, status_code=400)
     try:
-        parsed = parse_quick_add(text, timezone_name=payload.timezone)
+        parsed = parse_quick_add(text, timezone_name=timezones.normalize(payload.timezone))
     except ValueError:
-        parsed = parse_quick_add(text)
+        parsed = parse_quick_add(text, timezone_name=timezones.normalize(user.timezone))
     # Default to Inbox; if request specified project_id, validate ownership.
     target_project_id = (await ensure_inbox(session, user.id)).id
     if payload.project_id:
@@ -1190,7 +1204,7 @@ async def api_pomodoro_stop(
     response: dict[str, object] = {"stopped": _pomo_to_dict(pomo)}
     # P5: suggest break после focus
     if pomo.kind == "focus" and pomo.completed:
-        focus_count = await count_focus_today(session, user.id)
+        focus_count = await count_focus_today(session, user.id, tz=user.timezone)
         suggest_long = focus_count > 0 and focus_count % 4 == 0
         response["suggest_break"] = "break-long" if suggest_long else "break-short"
     return JSONResponse(response)

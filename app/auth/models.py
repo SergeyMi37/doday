@@ -66,6 +66,17 @@ class User(Base):
     # перезапускает процесс и обнулял бы защиту.
     signup_ip: Mapped[str | None] = mapped_column(String(45), nullable=True, index=True)
     signup_subnet: Mapped[str | None] = mapped_column(String(45), nullable=True, index=True)
+    # Часовой пояс пользователя в виде имени IANA («Europe/Moscow»). По нему
+    # считаются границы суток: «Сегодня», серии, дайджест. Определяется
+    # браузером автоматически и обновляется при переезде; NULL означает, что
+    # браузер ещё не успел сообщить — тогда берётся пояс по умолчанию.
+    timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # True — пояс приходит от браузера и сам меняется при переезде. False —
+    # человек выбрал пояс руками в настройках, и браузер его больше не трогает:
+    # у того, кто живёт на два города, своё мнение о том, где у него день.
+    timezone_auto: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     # Поколение сессий. Сессия живёт только в подписанной cookie, серверного
     # хранилища нет — то есть отозвать её нечем: смена пароля не выкидывала
     # того, кто увёл cookie, и она работала все две недели. Номер поколения

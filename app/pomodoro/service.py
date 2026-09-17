@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.pomodoro.models import PomodoroSession
 
 DURATION_FOCUS_MIN = 25
@@ -118,9 +119,9 @@ async def time_on_task(session: AsyncSession, user_id: UUID, task_id: UUID) -> i
     return int(seconds // 60)
 
 
-async def count_focus_today(session: AsyncSession, user_id: UUID) -> int:
+async def count_focus_today(session: AsyncSession, user_id: UUID, *, tz: str | None = None) -> int:
     """Сколько focus-сессий сегодня (для long-break suggestion после каждых 4)."""
-    today = datetime.now(UTC).date()
+    day_start, day_end = timezones.day_bounds(tz)
     rows = await session.execute(
         select(func.count())
         .select_from(PomodoroSession)
@@ -128,7 +129,8 @@ async def count_focus_today(session: AsyncSession, user_id: UUID) -> int:
             PomodoroSession.user_id == user_id,
             PomodoroSession.kind == "focus",
             PomodoroSession.completed.is_(True),
-            func.date(PomodoroSession.started_at) == today,
+            PomodoroSession.started_at >= day_start,
+            PomodoroSession.started_at < day_end,
         )
     )
     return int(rows.scalar_one())

@@ -5,9 +5,11 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import CursorResult, and_, case, delete, func, select, update
+from sqlalchemy import CursorResult, and_, case, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
+from app import timezones
 from app.projects.membership import is_member, member_project_ids
 from app.projects.service import ProjectNotFound, ensure_inbox, get_project
 from app.tasks.models import Task, TaskPriority
@@ -192,19 +194,74 @@ async def subtask_counts_for(
     return counts
 
 
-async def list_today(session: AsyncSession, user_id: UUID) -> list[Task]:
-    """Tasks due today (in UTC) plus everything overdue. Excludes completed."""
-    now = datetime.now(UTC)
-    # Boundary is the start of tomorrow, not 23:59:59: a task due at
-    # 23:59:59.5 is still today, and the old comparison dropped it from Today.
-    tomorrow = datetime(now.year, now.month, now.day, tzinfo=UTC) + timedelta(days=1)
+def visible_day(task: Task, tz: str | None) -> date | None:
+    """День, в который пользователь видит задачу. None — если срока нет.
+
+    Нужна там, где задачи раскладываются по дням: «Сегодня», «Ближайшие»,
+    календарь. Раньше в этих местах стояло `task.due_at.date()`, то есть день
+    по UTC.
+    """
+    if task.due_at is None:
+        return None
+    return timezones.due_day(task.due_at, date_only=task.due_date_only, tz=tz)
+
+
+def due_before(day: date, tz: str | None) -> ColumnElement[bool]:
+    """Срок раньше начала дня `day` — с поправкой на два вида срока.
+
+    Задача со временем («в 18:00») — это момент, её сравниваем с началом суток
+    в поясе пользователя. Задача на день («в четверг») — календарная дата,
+    она хранится в UTC и при переезде никуда не едет. Подробности — в
+    `app/timezones.py`, `floating_start`.
+
+    Сравниваем именно значение колонки с константой: так работает индекс по
+    `due_at`. Обёртка вида `date(due_at AT TIME ZONE ...) <= ...` тоже дала бы
+    правильный ответ, но заставила бы базу читать таблицу целиком.
+    """
+    return or_(
+        and_(Task.due_date_only.is_(False), Task.due_at < timezones.day_start(tz, day)),
+        and_(Task.due_date_only.is_(True), Task.due_at < timezones.floating_start(day)),
+    )
+
+
+def due_on_day(day: date, tz: str | None) -> ColumnElement[bool]:
+    """Срок приходится ровно на день `day` — для чужих запросов."""
+    return and_(~due_before(day, tz), due_before(day + timedelta(days=1), tz))
+
+
+def visible_day_sql(tz: str | None) -> ColumnElement[date]:
+    """День задачи в SQL — для GROUP BY по дням.
+
+    Повторяет `visible_day`, но на стороне базы: у задачи на день берём
+    дату как есть (она в UTC и не едет), у задачи со временем — дату в
+    поясе пользователя.
+    """
+    return cast(
+        "ColumnElement[date]",
+        case(
+            (Task.due_date_only.is_(True), timezones.local_date_sql(Task.due_at, "UTC")),
+            else_=timezones.local_date_sql(Task.due_at, tz),
+        ),
+    )
+
+
+async def list_today(session: AsyncSession, user_id: UUID, *, tz: str | None = None) -> list[Task]:
+    """Tasks due today plus everything overdue. Excludes completed.
+
+    «Сегодня» — это сутки в поясе пользователя, а не в UTC. Для Москвы разница
+    в три часа: задача на 01:00 понедельника по UTC ещё воскресная, и до
+    появления `tz` она в понедельник не показывалась.
+    """
+    # Верхняя граница — начало завтрашних суток, а не 23:59:59: задача со
+    # сроком 23:59:59.5 всё ещё сегодняшняя.
+    tomorrow = timezones.today_in(tz) + timedelta(days=1)
     stmt = (
         select(Task)
         .where(
             Task.user_id == user_id,
             Task.is_completed.is_(False),
             Task.due_at.is_not(None),
-            Task.due_at < tomorrow,
+            due_before(tomorrow, tz),
             Task.deleted_at.is_(None),
         )
         .order_by(Task.due_at, Task.priority, Task.position)
@@ -213,18 +270,22 @@ async def list_today(session: AsyncSession, user_id: UUID) -> list[Task]:
     return list(result.scalars().all())
 
 
-async def list_upcoming(session: AsyncSession, user_id: UUID, *, days: int = 7) -> list[Task]:
+async def list_upcoming(
+    session: AsyncSession, user_id: UUID, *, days: int = 7, tz: str | None = None
+) -> list[Task]:
     """Tasks due in the next N days (excluding overdue / today)."""
-    now = datetime.now(UTC)
-    start = datetime(now.year, now.month, now.day, 0, 0, 0, tzinfo=UTC) + timedelta(days=1)
-    end = start + timedelta(days=days)
+    today = timezones.today_in(tz)
+    # Окно считаем в календарных днях, а не «начало + N×24 часа»: в неделю с
+    # переходом на летнее время суток по-прежнему семь, а часов — 167 или 169.
+    tomorrow = today + timedelta(days=1)
     stmt = (
         select(Task)
         .where(
             Task.user_id == user_id,
             Task.is_completed.is_(False),
             Task.due_at.is_not(None),
-            and_(Task.due_at >= start, Task.due_at < end),
+            ~due_before(tomorrow, tz),
+            due_before(tomorrow + timedelta(days=days), tz),
             Task.deleted_at.is_(None),
         )
         .order_by(Task.due_at, Task.priority, Task.position)
@@ -251,18 +312,19 @@ async def list_completed(session: AsyncSession, user_id: UUID, *, limit: int = 2
 
 
 async def list_completed_today(
-    session: AsyncSession, user_id: UUID, *, limit: int = 10
+    session: AsyncSession, user_id: UUID, *, limit: int = 10, tz: str | None = None
 ) -> list[Task]:
-    """Tasks completed today (UTC), most-recent first — fuel for the
+    """Tasks completed today, most-recent first — fuel for the
     'Recently completed' widget on /today."""
-    today = datetime.now(UTC).date()
+    start, end = timezones.day_bounds(tz)
     stmt = (
         select(Task)
         .where(
             Task.user_id == user_id,
             Task.is_completed.is_(True),
             Task.completed_at.is_not(None),
-            func.date(Task.completed_at) == today,
+            Task.completed_at >= start,
+            Task.completed_at < end,
             Task.deleted_at.is_(None),
         )
         .order_by(Task.completed_at.desc().nulls_last())
@@ -276,15 +338,23 @@ async def list_in_range(
     session: AsyncSession,
     user_id: UUID,
     *,
-    start: datetime,
-    end: datetime,
+    first_day: date,
+    last_day: date,
+    tz: str | None = None,
 ) -> list[Task]:
+    """Tasks the user sees on days [first_day, last_day) — окно календаря.
+
+    Принимает календарные даты, а не моменты: сетка календаря — это дни, и
+    переводить их в моменты должен тот, кто знает про пояс и про два вида
+    срока, а не вызывающая сторона.
+    """
     stmt = (
         select(Task)
         .where(
             Task.user_id == user_id,
             Task.due_at.is_not(None),
-            and_(Task.due_at >= start, Task.due_at < end),
+            ~due_before(first_day, tz),
+            due_before(last_day, tz),
             Task.deleted_at.is_(None),
         )
         .order_by(Task.due_at, Task.priority)

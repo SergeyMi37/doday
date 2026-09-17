@@ -156,7 +156,7 @@ async def chat_state(
         has_credential=cred is not None,
         provider=cred.provider if cred else "",
         model=cred.model if cred else "",
-        used_today=await ai_chat.usage_today(session, user.id),
+        used_today=await ai_chat.usage_today(session, user.id, tz=user.timezone),
         daily_limit=ai_chat.DAILY_LIMIT,
         messages=[
             MessageOut(
@@ -205,7 +205,7 @@ async def stream_answer(
 
     task_id = _parse_task_id(payload.task_id)
     try:
-        await ai_chat.check_and_count(session, user.id)
+        await ai_chat.check_and_count(session, user.id, tz=user.timezone)
     except ai_chat.LimitReached as exc:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,

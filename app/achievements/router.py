@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/achievements", tags=["achievements"])
 
 @router.get("")
 async def list_endpoint(user: RequiredUser, session: DbSession) -> dict[str, object]:
-    unlocked = await compute_unlocked(session, user.id)
+    unlocked = await compute_unlocked(session, user.id, tz=user.timezone)
     items = [
         {
             "code": a["code"],

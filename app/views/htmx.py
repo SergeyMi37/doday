@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, or_, select
 
+from app import timezones
 from app.auth.deps import DbSession, RequiredUser
 from app.labels.service import attach_label, find_or_create_by_name
 from app.projects.models import Project
@@ -162,7 +163,9 @@ async def snooze_task(
         task = await get_task(session, user.id, task_id)
     except TaskNotFound as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "задача не найдена") from e
-    base = task.due_at if task.due_at else datetime.now(UTC)
+    # Без срока «отложить на день» значит «завтра» — по календарю человека,
+    # а не по UTC: поздним вечером это разные дни.
+    base = task.due_at or timezones.floating_start(timezones.today_in(user.timezone))
     new_due = base + timedelta(days=max(1, min(30, days)))
     task.due_at = new_due
     task.due_date_only = True
@@ -249,13 +252,13 @@ async def quickadd_endpoint(
     text: Annotated[str, Form()],
     project_id: Annotated[UUID | None, Form()] = None,
     section_id: Annotated[UUID | None, Form()] = None,
-    timezone: Annotated[str, Form()] = "UTC",
+    timezone: Annotated[str, Form()] = "",
 ) -> Response:
     """Parse a free-form quick-add string, create the task, attach labels."""
-    try:
-        parsed = parse_quick_add(text, timezone_name=timezone)
-    except ValueError:
-        parsed = parse_quick_add(text)
+    # Пояс присылает страница; если поле не пришло или в нём чушь, берём тот,
+    # что сохранён в профиле. Значением по умолчанию был UTC, из-за чего
+    # «завтра в 18:00» уезжало на три часа вперёд.
+    parsed = parse_quick_add(text, timezone_name=timezones.normalize(timezone or user.timezone))
 
     target_project_id = project_id
     if parsed.project_name and target_project_id is None:

@@ -319,6 +319,47 @@
     </div>
   </section>
 
+  {# Часовой пояс. По умолчанию его присылает браузер; выбор руками отключает
+     автоопределение — см. POST /api/profile/timezone. #}
+  <section class="card p-6"
+           x-data="{
+             value: {{ ('auto' if timezone_auto else current_timezone)|tojson|forceescape }},
+             saved: false,
+             err: '',
+             async save() {
+               this.err = ''; this.saved = false;
+               const fd = new FormData();
+               fd.set('timezone', this.value);
+               fd.set('auto', 'false');
+               try {
+                 const r = await fetch('/api/profile/timezone', {method: 'POST', body: fd, credentials: 'include'});
+                 if (!r.ok) { this.err = 'не получилось сохранить'; return; }
+                 this.saved = true;
+                 setTimeout(() => window.location.reload(), 400);
+               } catch (e) { this.err = 'нет сети'; }
+             }
+           }">
+    <h2 class="text-sm uppercase tracking-wider font-semibold text-[var(--text-muted)] mb-2">Часовой пояс</h2>
+    <p class="text-sm text-[var(--text-muted)] mb-5">
+      По нему считается «Сегодня», серия выполненных дней и время в напоминаниях.
+      Обычно определяется сам — и меняется, если ты переехал. Сейчас у тебя
+      <span class="font-semibold text-[var(--text)]">{{ local_now }}</span>,
+      пояс — <span class="font-semibold text-[var(--text)]">{{ current_timezone }}</span>.
+    </p>
+    <div class="flex flex-wrap items-center gap-3">
+      <select x-model="value" @change="save()"
+              class="px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]
+                     text-sm text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
+        <option value="auto">Определять автоматически{% if timezone_auto %} · {{ current_timezone }}{% endif %}</option>
+        {% for tz_name, tz_label in timezones_list %}
+          <option value="{{ tz_name }}">{{ tz_label }}</option>
+        {% endfor %}
+      </select>
+      <span x-show="saved" x-cloak class="text-xs text-emerald-400">✓ сохранено</span>
+      <span x-show="err" x-cloak class="text-xs text-rose-400" x-text="err"></span>
+    </div>
+  </section>
+
   <section class="card p-6"
            x-data="{
              browserOn: localStorage.getItem('doday-reminders-off') !== '1',
@@ -400,7 +441,7 @@
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-medium">🔒 Pro</span>
             {% endif %}
           </div>
-          <div class="text-xs text-[var(--text-muted)]">Каждое утро в 7:00 МСК — список задач на день: просроченные, сегодня и завтра. Тихо, никакого спама вне этого письма.</div>
+          <div class="text-xs text-[var(--text-muted)]">Каждое утро в 7:00 по твоему времени — список задач на день: просроченные, сегодня и завтра. Тихо, никакого спама вне этого письма.</div>
           <div x-show="err" x-cloak class="text-[10px] text-rose-400 mt-1" x-text="err"></div>
         </div>
         <button type="button" @click="toggle()" :aria-pressed="on" :disabled="busy"

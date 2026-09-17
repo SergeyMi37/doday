@@ -1,13 +1,14 @@
 """Stats service — aggregate completion counts and streak math."""
 
 from collections import Counter
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from typing import TypedDict
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.tasks.models import Task
 
 _RU_WEEKDAYS_NOM = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -34,10 +35,17 @@ class UserStats(TypedDict):
     avg_completion_hours: float  # average time created→completed (across all done)
 
 
-async def _completed_dates(session: AsyncSession, user_id: UUID) -> list[date]:
-    """All distinct UTC dates on which the user completed at least one task."""
+async def _completed_dates(
+    session: AsyncSession, user_id: UUID, *, tz: str | None = None
+) -> list[date]:
+    """Дни, в которые человек закрыл хотя бы одну задачу, — в его поясе.
+
+    Здесь дата считается на стороне базы: нужны все дни за всю историю, и
+    тянуть ради этого каждую отметку времени в питон незачем. Перевод в
+    пояс делает сам Postgres — у него тот же tzdata, что и у нас.
+    """
     result = await session.execute(
-        select(func.date(Task.completed_at))
+        select(timezones.local_date_sql(Task.completed_at, tz))
         .where(
             Task.user_id == user_id,
             Task.is_completed.is_(True),
@@ -50,15 +58,18 @@ async def _completed_dates(session: AsyncSession, user_id: UUID) -> list[date]:
     return sorted({d if isinstance(d, date) else date.fromisoformat(str(d)) for d in days_raw})
 
 
-async def current_streak(session: AsyncSession, user_id: UUID) -> int:
+async def current_streak(session: AsyncSession, user_id: UUID, *, tz: str | None = None) -> int:
     """Public: how many days in a row the user has completed at least one task.
 
     Cheap-enough for the /today header — one indexed query + a small Python loop.
     Counts today if anything done today; otherwise counts the streak ending
-    yesterday (so opening the app fresh in the morning doesn't show 0)."""
-    today = datetime.now(UTC).date()
-    days = await _completed_dates(session, user_id)
-    return _current_streak(days, today)
+    yesterday (so opening the app fresh in the morning doesn't show 0).
+
+    Серия считается по дням пользователя. В UTC она рвалась у всех, кто
+    живёт восточнее Гринвича: задача, закрытая в полночь по Москве, шла в
+    зачёт уже следующего дня, и вчерашний оставался пустым."""
+    days = await _completed_dates(session, user_id, tz=tz)
+    return _current_streak(days, timezones.today_in(tz))
 
 
 def _current_streak(days: list[date], today: date) -> int:
@@ -79,6 +90,24 @@ def _current_streak(days: list[date], today: date) -> int:
     return streak
 
 
+async def streak_summary(
+    session: AsyncSession, user_id: UUID, *, tz: str | None = None
+) -> dict[str, int | bool]:
+    """Серия для бейджа в шапке: текущая, лучшая, закрыто ли что-то сегодня.
+
+    Живёт здесь, а не в роутере, потому что раньше эту же арифметику
+    независимо считали в трёх местах — и, разумеется, по-разному.
+    """
+    today = timezones.today_in(tz)
+    days = await _completed_dates(session, user_id, tz=tz)
+    current = _current_streak(days, today)
+    return {
+        "current": current,
+        "longest": max(current, _longest_streak(days)),
+        "today_done": today in set(days),
+    }
+
+
 def _longest_streak(days: list[date]) -> int:
     if not days:
         return 0
@@ -94,15 +123,16 @@ def _longest_streak(days: list[date]) -> int:
     return longest
 
 
-async def compute_user_stats(session: AsyncSession, user_id: UUID) -> UserStats:
-    """One-shot dashboard payload for the stats page."""
-    now = datetime.now(UTC)
-    today = now.date()
+async def compute_user_stats(
+    session: AsyncSession, user_id: UUID, *, tz: str | None = None
+) -> UserStats:
+    """One-shot dashboard payload for the stats page. Дни — в поясе человека."""
+    today = timezones.today_in(tz)
     week_start = today - timedelta(days=today.weekday())  # Monday this week
     month_start = today.replace(day=1)
     last_14_start = today - timedelta(days=13)
 
-    days = await _completed_dates(session, user_id)
+    days = await _completed_dates(session, user_id, tz=tz)
     current = _current_streak(days, today)
     longest = _longest_streak(days)
 
@@ -117,10 +147,12 @@ async def compute_user_stats(session: AsyncSession, user_id: UUID) -> UserStats:
                 Task.deleted_at.is_(None),
             )
         )
+        # Границы суток, а не date(completed_at): так работает индекс по
+        # completed_at, и запрос не читает всю историю целиком.
         if since is not None:
-            stmt = stmt.where(func.date(Task.completed_at) >= since)
+            stmt = stmt.where(Task.completed_at >= timezones.day_start(tz, since))
         if until is not None:
-            stmt = stmt.where(func.date(Task.completed_at) <= until)
+            stmt = stmt.where(Task.completed_at < timezones.day_end(tz, until))
         return (await session.execute(stmt)).scalar_one()
 
     done_today = await count_done(today, today)
@@ -129,16 +161,16 @@ async def compute_user_stats(session: AsyncSession, user_id: UUID) -> UserStats:
     done_total = await count_done()
 
     # Per-day counts for last 14 days (for the bar chart)
+    local_day = timezones.local_date_sql(Task.completed_at, tz)
     rows = await session.execute(
-        select(func.date(Task.completed_at), func.count())
+        select(local_day, func.count())
         .where(
             Task.user_id == user_id,
             Task.is_completed.is_(True),
-            Task.completed_at.is_not(None),
+            Task.completed_at >= timezones.day_start(tz, last_14_start),
             Task.deleted_at.is_(None),
-            func.date(Task.completed_at) >= last_14_start,
         )
-        .group_by(func.date(Task.completed_at))
+        .group_by(local_day)
     )
     by_day: dict[date, int] = {}
     for d, n in rows.all():

@@ -564,6 +564,33 @@
         } catch (e) { /* старые браузеры — ну и ладно */ }
       })();
     </script>
+    {% if current_user is defined and current_user %}
+    <script>
+      // Часовой пояс. Браузер знает его точно, сервер — только то, что ему
+      // однажды сказали. Шлём, лишь когда сохранённый пояс не совпадает с
+      // текущим: обычная загрузка страницы не делает лишнего запроса, а
+      // переезд подхватывается сам, без единой настройки.
+      (function () {
+        try {
+          var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (!zone) return;
+          var known = {{ (current_user.timezone or '')|tojson }};
+          var auto = {{ 'true' if current_user.timezone_auto else 'false' }};
+          if (!auto || zone === known) return;
+          var body = new FormData();
+          body.set('timezone', zone);
+          body.set('auto', 'true');
+          fetch('/api/profile/timezone', {method: 'POST', body: body, credentials: 'same-origin'})
+            .then(function (r) {
+              // В самый первый раз страница уже отрисована по поясу по
+              // умолчанию — перечитываем, чтобы «Сегодня» сразу стало верным.
+              if (r.ok && !known) window.location.reload();
+            })
+            .catch(function () { /* офлайн — не беда, пришлём в следующий раз */ });
+        } catch (e) { /* нет Intl — остаёмся на поясе по умолчанию */ }
+      })();
+    </script>
+    {% endif %}
 </head>
 <body>
     {# Skip-to-content для screen-reader / keyboard навигации. Виден только при

@@ -4,13 +4,14 @@ This router exposes only GET endpoints and zero mutations, so it cannot affect
 any existing data or authorization path.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 
+from app import timezones
 from app.auth.deps import DbSession
 from app.auth.models import User
 from app.projects.membership import assignee_map_for_project
@@ -22,7 +23,7 @@ from app.share.service import (
     read_progress_token,
 )
 from app.tasks.models import Task
-from app.tasks.service import list_completed_today, list_today
+from app.tasks.service import list_completed_today, list_today, visible_day
 from app.views.router import templates  # reuse the env with due_label/due_state globals
 
 router = APIRouter(prefix="/share", tags=["share"])
@@ -40,11 +41,19 @@ async def progress_view(request: Request, token: str, session: DbSession) -> HTM
     if child is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Пользователь не найден")
 
-    tasks = await list_today(session, child.id)
-    today_date = datetime.now(UTC).date()
-    overdue = [t for t in tasks if t.due_at and t.due_at.date() < today_date]
-    today = [t for t in tasks if t.due_at and t.due_at.date() >= today_date]
+    # Страницу открывает родитель, но день здесь — детский. Если ребёнок
+    # учится во Владивостоке, а родитель смотрит из Москвы, «Сегодня»
+    # означает сегодня у ребёнка. Пояс кладём и в контекст запроса: из него
+    # шаблон берёт подписи «Сегодня / Завтра» у строк задач.
+    tz = child.timezone
+    timezones.use(tz)
+    tasks = await list_today(session, child.id, tz=tz)
+    today_date = timezones.today_in(tz)
+    days_of = {t.id: visible_day(t, tz) for t in tasks}
+    overdue = [t for t in tasks if (d := days_of[t.id]) is not None and d < today_date]
+    today = [t for t in tasks if (d := days_of[t.id]) is not None and d >= today_date]
 
+    day_start, day_end = timezones.day_bounds(tz, today_date)
     done_today = (
         await session.execute(
             select(func.count())
@@ -52,13 +61,13 @@ async def progress_view(request: Request, token: str, session: DbSession) -> HTM
             .where(
                 Task.user_id == child.id,
                 Task.is_completed.is_(True),
-                Task.completed_at.is_not(None),
-                func.date(Task.completed_at) == today_date,
+                Task.completed_at >= day_start,
+                Task.completed_at < day_end,
             )
         )
     ).scalar_one()
 
-    week_start = today_date - timedelta(days=today_date.weekday())
+    week_start = timezones.day_start(tz, today_date - timedelta(days=today_date.weekday()))
     done_week = (
         await session.execute(
             select(func.count())
@@ -66,14 +75,13 @@ async def progress_view(request: Request, token: str, session: DbSession) -> HTM
             .where(
                 Task.user_id == child.id,
                 Task.is_completed.is_(True),
-                Task.completed_at.is_not(None),
-                func.date(Task.completed_at) >= week_start,
-                func.date(Task.completed_at) <= today_date,
+                Task.completed_at >= week_start,
+                Task.completed_at < day_end,
             )
         )
     ).scalar_one()
 
-    completed_today = await list_completed_today(session, child.id, limit=10)
+    completed_today = await list_completed_today(session, child.id, limit=10, tz=tz)
 
     return templates.TemplateResponse(
         request,
@@ -104,7 +112,15 @@ async def group_view(request: Request, token: str, session: DbSession) -> HTMLRe
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Проект не найден")
 
     members = await assignee_map_for_project(session, project_id)
-    today_date = datetime.now(UTC).date()
+    # У класса может быть несколько поясов сразу, поэтому «сегодня» здесь
+    # своё для каждого участника.
+    member_tz = {
+        uid: tz_name
+        for uid, tz_name in (
+            await session.execute(select(User.id, User.timezone).where(User.id.in_(list(members))))
+        ).all()
+    }
+    today_of = {uid: timezones.today_in(tz) for uid, tz in member_tz.items()}
 
     tasks = (
         (
@@ -125,14 +141,17 @@ async def group_view(request: Request, token: str, session: DbSession) -> HTMLRe
     }
     for t in tasks:
         s = stats.get(t.assigned_to) if t.assigned_to else None
-        if s is None:
+        if s is None or t.assigned_to is None:
             continue
+        tz = member_tz.get(t.assigned_to)
+        today_date = today_of.get(t.assigned_to, timezones.today_in(tz))
         if t.is_completed:
-            if t.completed_at and t.completed_at.date() == today_date:
+            if t.completed_at and timezones.local_date_of(t.completed_at, tz) == today_date:
                 s["done_today"] += 1
         else:
             s["open"] += 1
-            if t.due_at and t.due_at.date() < today_date:
+            day = visible_day(t, tz)
+            if day is not None and day < today_date:
                 s["overdue"] += 1
 
     rows = sorted(

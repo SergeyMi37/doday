@@ -47,7 +47,10 @@ async def opted_in_user(db_session: AsyncSession) -> AsyncIterator[User]:
     yield user
 
 
-_FIXED_NOW = datetime(2026, 5, 9, 12, 0, 0, tzinfo=UTC)
+# 04:00 UTC — это 07:00 в Москве, то есть тот самый час, когда уходит письмо.
+# Рассылка теперь смотрит на часы получателя, поэтому момент в тесте должен
+# быть утренним именно в его поясе.
+_FIXED_NOW = datetime(2026, 5, 9, 4, 0, 0, tzinfo=UTC)
 
 
 async def _seed_tasks(session: AsyncSession, user: User) -> None:

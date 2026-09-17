@@ -6,6 +6,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import delete
 
+from app import timezones
 from app.auth.deps import DbSession, RequiredUser
 from app.auth.models import User
 from app.auth.security import hash_password, verify_password
@@ -80,6 +81,47 @@ async def update_morning_digest(
     user.morning_digest_enabled = new_value
     await session.commit()
     return {"enabled": new_value}
+
+
+@router.post("/timezone")
+async def update_timezone(
+    user: RequiredUser,
+    session: DbSession,
+    timezone: Annotated[str, Form()],
+    auto: Annotated[str, Form()] = "true",
+) -> dict[str, str | bool]:
+    """Сохранить часовой пояс.
+
+    Два источника, и они не равны по правам:
+
+    * браузер (`auto=true`) — присылает `Intl.DateTimeFormat().resolvedOptions()`
+      при каждой загрузке страницы, если сохранённый пояс не совпадает с
+      текущим. Так переезд подхватывается сам, без единой настройки;
+    * человек (`auto=false`) — выбрал пояс руками в настройках. После этого
+      браузер молчит: у того, кто живёт на два города, своё мнение о том, где
+      у него день, и перебивать его автоматикой нельзя.
+
+    Строку из браузера проверяем по базе tzdata: прилететь сюда может что
+    угодно.
+    """
+    wants_auto = auto.lower() in ("1", "true", "on", "yes")
+
+    # «auto» в выпадающем списке — просьба снова доверять браузеру.
+    if not wants_auto and timezone == "auto":
+        user.timezone_auto = True
+        await session.commit()
+        return {"timezone": timezones.normalize(user.timezone), "auto": True}
+
+    if wants_auto and not user.timezone_auto:
+        return {"timezone": timezones.normalize(user.timezone), "auto": False}
+
+    if not timezones.is_valid(timezone):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "неизвестный часовой пояс")
+
+    user.timezone = timezone
+    user.timezone_auto = wants_auto
+    await session.commit()
+    return {"timezone": timezone, "auto": wants_auto}
 
 
 @router.post("/telegram-link")

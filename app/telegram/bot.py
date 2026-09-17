@@ -32,7 +32,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from datetime import time as dtime
 from typing import Any
 
@@ -63,14 +63,18 @@ import app.school.models
 import app.sections.models
 import app.tasks.models
 import app.telegram.models  # noqa: F401 — mapper warmup
+from app import timezones
 from app.auth.models import User
 from app.config import get_settings
 from app.quickadd.parser import parse_quick_add
 from app.tasks.models import Task, TaskPriority
-from app.tasks.service import create_task
+from app.tasks.service import create_task, list_today, list_upcoming
 from app.telegram.service import complete_link, get_user_by_chat, unlink
 
 logger = logging.getLogger("doday.telegram")
+
+# Во сколько по местному времени уходит утренняя сводка в Telegram.
+MORNING_DIGEST_HOUR = 9
 
 
 # Hardcoded IPv4 Telegram API. systemd-resolved отдаёт только AAAA, а
@@ -339,7 +343,9 @@ async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user = await _get_user_or_prompt(update, session)
         if user is None:
             return
-        parsed = parse_quick_add(raw)
+        # Пояс пользователя: без него «завтра в 18:00», присланное из
+        # Telegram, превращалось в 18:00 UTC — то есть в 21:00 по Москве.
+        parsed = parse_quick_add(raw, timezone_name=timezones.normalize(user.timezone))
         task = await create_task(
             session,
             user.id,
@@ -357,14 +363,16 @@ async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _reply(update, msg, markdown=True)
 
 
-def _format_task_line(t: Task) -> str:
+def _format_task_line(t: Task, tz: str | None = None) -> str:
     prio_emoji = {"p1": "🔴", "p2": "🟠", "p3": "🔵", "p4": "  "}.get(t.priority.value, "  ")
     date_str = ""
     if t.due_at:
         if t.due_date_only:
             date_str = f" · {t.due_at.strftime('%d.%m')}"
         else:
-            date_str = f" · {t.due_at.strftime('%d.%m %H:%M')}"
+            # Время показываем на часах пользователя, а не в UTC.
+            local = t.due_at.astimezone(timezones.zone_of(tz))
+            date_str = f" · {local.strftime('%d.%m %H:%M')}"
     return f"{prio_emoji} {t.title}{date_str}"
 
 
@@ -374,26 +382,12 @@ async def cmd_today(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         user = await _get_user_or_prompt(update, session)
         if user is None:
             return
-        now = datetime.now(UTC)
-        today_end = datetime.combine(now.date(), dtime.max, tzinfo=UTC)
-        stmt = (
-            select(Task)
-            .where(
-                Task.user_id == user.id,
-                Task.is_completed.is_(False),
-                Task.deleted_at.is_(None),
-                Task.due_at.is_not(None),
-                Task.due_at <= today_end,
-            )
-            .order_by(Task.due_at)
-            .limit(20)
-        )
-        rows = list((await session.execute(stmt)).scalars().all())
+        rows = (await list_today(session, user.id, tz=user.timezone))[:20]
         if not rows:
             await _reply(update, "Сегодня всё чисто. Используй /add чтобы что-то запланировать.")
             return
         lines = ["*На сегодня и просрочка:*\n"]
-        lines.extend(_format_task_line(t) for t in rows)
+        lines.extend(_format_task_line(t, user.timezone) for t in rows)
         await _reply(update, "\n".join(lines), markdown=True)
 
 
@@ -403,27 +397,12 @@ async def cmd_upcoming(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         user = await _get_user_or_prompt(update, session)
         if user is None:
             return
-        now = datetime.now(UTC)
-        in_a_week = now + timedelta(days=7)
-        stmt = (
-            select(Task)
-            .where(
-                Task.user_id == user.id,
-                Task.is_completed.is_(False),
-                Task.deleted_at.is_(None),
-                Task.due_at.is_not(None),
-                Task.due_at >= now,
-                Task.due_at <= in_a_week,
-            )
-            .order_by(Task.due_at)
-            .limit(20)
-        )
-        rows = list((await session.execute(stmt)).scalars().all())
+        rows = (await list_upcoming(session, user.id, days=7, tz=user.timezone))[:20]
         if not rows:
             await _reply(update, "На неделю ничего не запланировано.")
             return
         lines = ["*На 7 дней:*\n"]
-        lines.extend(_format_task_line(t) for t in rows)
+        lines.extend(_format_task_line(t, user.timezone) for t in rows)
         await _reply(update, "\n".join(lines), markdown=True)
 
 
@@ -676,36 +655,33 @@ async def _job_check_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def _job_morning_digest(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """ε N4: каждое утро 09:00 МСК (06:00 UTC) — short digest активных задач."""
-    from datetime import UTC, datetime
-    from datetime import time as dtime
+    """Утренняя сводка — каждому в 9 утра по его местному времени.
 
+    Задание крутится раз в час и на каждом обороте забирает тех, у кого сейчас
+    ровно девять. Раньше оно срабатывало раз в сутки в 06:00 UTC: в Москве это
+    девять утра, но в Калининграде восемь, а во Владивостоке уже четыре дня.
+    """
     from app.auth.models import User
     from app.telegram.models import TelegramLink
 
     sm = _get_sessionmaker()
+    now = datetime.now(UTC)
     async with sm() as session:
         rows = await session.execute(
             select(User, TelegramLink)
             .join(TelegramLink, TelegramLink.user_id == User.id)
             .where(TelegramLink.chat_id.is_not(None))
         )
-        today_date = datetime.now(UTC).date()
-        today_end = datetime.combine(today_date, dtime.max, tzinfo=UTC)
         for user, link in rows.all():
-            tasks_q = await session.execute(
-                select(Task)
-                .where(
-                    Task.user_id == user.id,
-                    Task.is_completed.is_(False),
-                    Task.deleted_at.is_(None),
-                    Task.due_at.is_not(None),
-                    Task.due_at <= today_end,
-                )
-                .order_by(Task.priority, Task.due_at)
-                .limit(10)
-            )
-            tasks = list(tasks_q.scalars().all())
+            local_now = now.astimezone(timezones.zone_of(user.timezone))
+            if local_now.hour != MORNING_DIGEST_HOUR:
+                continue
+            # Защита от повтора: бот мог перезапуститься внутри того же часа.
+            day_start = timezones.day_start(user.timezone, local_now.date())
+            if link.last_digest_sent_at is not None and link.last_digest_sent_at >= day_start:
+                continue
+
+            tasks = (await list_today(session, user.id, tz=user.timezone))[:10]
             if not tasks:
                 continue
             lines = [f"🌅 *Доброе утро!* На сегодня {len(tasks)} задач:\n"]
@@ -722,6 +698,9 @@ async def _job_morning_digest(context: ContextTypes.DEFAULT_TYPE) -> None:
                 )
             except Exception as e:
                 logger.warning("Failed to send morning digest to %s: %s", link.chat_id, e)
+                continue
+            link.last_digest_sent_at = now
+            await session.commit()
 
 
 def build_doday_app() -> Application[Any, Any, Any, Any, Any, Any]:
@@ -800,15 +779,22 @@ def build_doday_app() -> Application[Any, Any, Any, Any, Any, Any]:
         application.job_queue.run_repeating(
             _job_check_reminders, interval=60, first=10, name="check_reminders"
         )
-        # Каждый день 06:00 UTC (≈09:00 МСК) — morning digest.
-        from datetime import time as dtime
-
-        application.job_queue.run_daily(
+        # Раз в час — утренняя сводка тем, у кого сейчас девять утра.
+        # Первый запуск выравниваем на начало ближайшего часа, чтобы проверка
+        # часа не промахивалась мимо него на несколько минут.
+        now = datetime.now(UTC)
+        to_next_hour = 3600 - (now.minute * 60 + now.second)
+        application.job_queue.run_repeating(
             _job_morning_digest,
-            time=dtime(hour=6, minute=0, tzinfo=UTC),
+            interval=3600,
+            first=to_next_hour,
             name="morning_digest",
         )
-        logger.info("JobQueue tasks scheduled: check_reminders (1 min), morning_digest (06:00 UTC)")
+        logger.info(
+            "JobQueue tasks scheduled: check_reminders (1 min), morning_digest (hourly, "
+            "%02d:00 local per user)",
+            MORNING_DIGEST_HOUR,
+        )
     else:
         logger.warning("JobQueue not available — reminders/digest cron disabled")
 

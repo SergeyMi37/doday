@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import timezones
 from app.habits.models import Habit, HabitCheckin
 
 
@@ -75,11 +76,16 @@ async def archive_habit(session: AsyncSession, user_id: UUID, habit_id: UUID) ->
 
 
 async def check_in(
-    session: AsyncSession, user_id: UUID, habit_id: UUID, *, on_date: date | None = None
+    session: AsyncSession,
+    user_id: UUID,
+    habit_id: UUID,
+    *,
+    on_date: date | None = None,
+    tz: str | None = None,
 ) -> HabitCheckin:
     """Idempotent — if a check-in for the date already exists, returns it."""
     habit = await get_habit(session, user_id, habit_id)
-    target = on_date or datetime.now(UTC).date()
+    target = on_date or timezones.today_in(tz)
     existing = (
         await session.execute(
             select(HabitCheckin).where(
@@ -97,10 +103,15 @@ async def check_in(
 
 
 async def uncheck(
-    session: AsyncSession, user_id: UUID, habit_id: UUID, *, on_date: date | None = None
+    session: AsyncSession,
+    user_id: UUID,
+    habit_id: UUID,
+    *,
+    on_date: date | None = None,
+    tz: str | None = None,
 ) -> None:
     habit = await get_habit(session, user_id, habit_id)
-    target = on_date or datetime.now(UTC).date()
+    target = on_date or timezones.today_in(tz)
     await session.execute(
         delete(HabitCheckin).where(
             HabitCheckin.habit_id == habit.id, HabitCheckin.checkin_date == target
@@ -109,10 +120,12 @@ async def uncheck(
     await session.commit()
 
 
-async def stats_for(session: AsyncSession, user_id: UUID, habit_id: UUID) -> dict[str, object]:
+async def stats_for(
+    session: AsyncSession, user_id: UUID, habit_id: UUID, *, tz: str | None = None
+) -> dict[str, object]:
     """30-day window + current/longest streak for a habit."""
     habit = await get_habit(session, user_id, habit_id)
-    today = datetime.now(UTC).date()
+    today = timezones.today_in(tz)
     horizon = today - timedelta(days=400)
     rows = await session.execute(
         select(HabitCheckin.checkin_date)

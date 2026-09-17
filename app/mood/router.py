@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/mood", tags=["mood"])
 
 @router.get("/today")
 async def today_endpoint(user: RequiredUser, session: DbSession) -> dict[str, object]:
-    entry = await get_today(session, user.id)
+    entry = await get_today(session, user.id, tz=user.timezone)
     if entry is None:
         return {"recorded": False}
     return {
@@ -31,7 +31,7 @@ async def upsert_today(
     note: Annotated[str | None, Form()] = None,
 ) -> dict[str, object]:
     try:
-        entry = await upsert_mood(session, user.id, score=score, note=note)
+        entry = await upsert_mood(session, user.id, score=score, note=note, tz=user.timezone)
     except ValueError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
     return {
@@ -46,5 +46,5 @@ async def upsert_today(
 async def history_endpoint(
     user: RequiredUser, session: DbSession, days: int = 30
 ) -> list[dict[str, object]]:
-    rows = await history(session, user.id, days=max(7, min(days, 365)))
+    rows = await history(session, user.id, days=max(7, min(days, 365)), tz=user.timezone)
     return [{"mood_date": r.mood_date.isoformat(), "score": r.score, "note": r.note} for r in rows]
