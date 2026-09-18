@@ -9,7 +9,7 @@
 // такой запрос несёт заголовок Idempotency-Key, и сервер выполнит работу
 // только один раз (см. app/idempotency/).
 
-const CACHE = 'doday-shell-v2';
+const CACHE = 'doday-shell-v3';
 const SHELL = ['/app/today', '/manifest.webmanifest'];
 const DB_NAME = 'doday-outbox';
 const STORE = 'requests';
@@ -176,30 +176,42 @@ self.addEventListener('fetch', (e) => {
   // Тело запроса читается один раз, поэтому копию снимаем заранее — до
   // того, как его заберёт fetch.
   const copy = req.clone();
-  e.respondWith(
-    fetch(req).catch(async () => {
-      const headers = {};
-      copy.headers.forEach((v, k) => {
-        if (['content-type', 'idempotency-key', 'hx-request', 'hx-current-url'].includes(k))
-          headers[k] = v;
-      });
-      const body = await copy.text();
-      await enqueue({ url: req.url, method: req.method, headers, body, at: Date.now() });
-      const left = (await allQueued()).length;
-      await tellPages({ type: 'outbox', pending: left, sent: 0 });
-      if ('sync' in self.registration) {
-        try {
-          await self.registration.sync.register(SYNC_TAG);
-        } catch (err) {
-          /* Safari не умеет Background Sync — отправим по событию online */
-        }
+
+  async function queueIt() {
+    const headers = {};
+    copy.headers.forEach((v, k) => {
+      if (['content-type', 'idempotency-key', 'hx-request', 'hx-current-url'].includes(k))
+        headers[k] = v;
+    });
+    const body = await copy.text();
+    await enqueue({ url: req.url, method: req.method, headers, body, at: Date.now() });
+    const left = (await allQueued()).length;
+    await tellPages({ type: 'outbox', pending: left, sent: 0 });
+    if ('sync' in self.registration) {
+      try {
+        await self.registration.sync.register(SYNC_TAG);
+      } catch (err) {
+        /* Safari не умеет Background Sync — отправим по событию online */
       }
-      // HX-Reswap: none — чтобы htmx не подставил этот ответ вместо строки
-      // задачи и не стёр её с экрана.
-      return new Response('', {
-        status: 202,
-        headers: { 'X-Doday-Queued': '1', 'HX-Reswap': 'none' },
-      });
-    })
+    }
+    // HX-Reswap: none — чтобы htmx не подставил этот ответ вместо строки
+    // задачи и не стёр её с экрана.
+    return new Response('', {
+      status: 202,
+      headers: { 'X-Doday-Queued': '1', 'HX-Reswap': 'none' },
+    });
+  }
+
+  e.respondWith(
+    fetch(req)
+      .then((r) => {
+        // Обрыв сети — не единственная причина, по которой запрос не доехал.
+        // Наш собственный деплой выглядит для клиента ровно так же: nginx
+        // секунд сорок отвечает 502, пока перезапускается приложение. Такой
+        // ответ значит «до приложения не дошло», и его тоже надо повторить.
+        if ([502, 503, 504].includes(r.status)) return queueIt();
+        return r;
+      })
+      .catch(queueIt)
   );
 });
