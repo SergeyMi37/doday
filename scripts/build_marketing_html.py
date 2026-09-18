@@ -59,6 +59,17 @@ def main() -> None:
                 "прямой ссылкой с getdoday.ru — перед публикацией проверьте превью."
             ),
         },
+        "habr-offline-queue": {
+            "title": "Хабр: запросы, которые не дошли",
+            "paste_target": "Хабр",
+            "source": "docs/articles/2026-09-18-habr-offline-queue.md",
+            "platform_note": (
+                "Откройте страницу /raw, скопируйте Markdown целиком и вставьте "
+                "в Markdown-режим редактора Хабра. Картинок в тексте нет — нужна "
+                "только обложка 780×440 из docs/habr-screenshots/"
+                "cover-offline-780x440.png."
+            ),
+        },
         "habr-timezones": {
             "title": "Хабр: часовые пояса по-настоящему",
             "paste_target": "Хабр",

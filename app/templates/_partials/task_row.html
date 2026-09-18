@@ -103,7 +103,10 @@
     class="shrink-0 w-6 h-6 rounded-full border-2 transition flex items-center justify-center
            hover:scale-110 active:scale-95
            {% if task.is_completed %}grad-bg border-transparent{% else %}border-{{ prio_class }}-400 hover:border-[var(--accent)]{% endif %}"
-    hx-post="/htmx/tasks/{{ task.id }}/toggle"
+    {# Шлём желаемое состояние, а не «переключи»: повтор такого запроса
+       ничего не ломает. См. app/views/htmx.py, set_task_state. #}
+    hx-post="/htmx/tasks/{{ task.id }}/state"
+    hx-vals='{"completed": "{{ "false" if task.is_completed else "true" }}"}'
     hx-target="#task-{{ task.id }}"
     hx-swap="outerHTML swap:160ms"
   >

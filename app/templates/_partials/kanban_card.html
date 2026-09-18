@@ -17,7 +17,8 @@
       class="shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 transition flex items-center justify-center
              hover:scale-110 active:scale-95
              {% if task.is_completed %}grad-bg border-transparent{% else %}border-{{ prio_class }}-400 hover:border-[var(--accent)]{% endif %}"
-      hx-post="/htmx/tasks/{{ task.id }}/toggle"
+      hx-post="/htmx/tasks/{{ task.id }}/state"
+      hx-vals='{"completed": "{{ "false" if task.is_completed else "true" }}"}'
       hx-target="closest .kanban-card"
       hx-swap="outerHTML swap:160ms"
     >

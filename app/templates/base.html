@@ -601,6 +601,89 @@
               focus:font-semibold focus:shadow-glow">
       Перейти к содержимому
     </a>
+    {% if current_user is defined and current_user %}
+    {# Значок «ждёт сети». Показывается, только когда очередь не пуста —
+       в обычной жизни его не видно. #}
+    <div id="outbox-badge" hidden
+         class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[95] px-3.5 py-2 rounded-full
+                text-xs font-semibold shadow-lg bg-amber-500/95 text-amber-950
+                flex items-center gap-2">
+      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span id="outbox-text">Нет сети — сохраним, когда появится</span>
+    </div>
+
+    <script>
+      // Действия, которые не дошли до сервера, не должны пропадать. Ловим их
+      // в service worker (см. /service-worker.js), а здесь — две вещи:
+      // подписываем каждый изменяющий запрос ключом и показываем человеку,
+      // что именно ещё не отправлено.
+      (function () {
+        function newKey() {
+          try {
+            return crypto.randomUUID();
+          } catch (e) {
+            return 'k-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+          }
+        }
+
+        // Ключ идемпотентности на каждый изменяющий запрос. Он живёт вместе
+        // с запросом: если запрос уйдёт в очередь и повторится через час,
+        // ключ будет тот же, и сервер поймёт, что работа уже сделана.
+        document.body.addEventListener('htmx:configRequest', function (e) {
+          var method = (e.detail.verb || '').toUpperCase();
+          if (method && method !== 'GET') e.detail.headers['Idempotency-Key'] = newKey();
+        });
+
+        var badge = document.getElementById('outbox-badge');
+        var text = document.getElementById('outbox-text');
+
+        function show(pending) {
+          if (!badge) return;
+          if (pending > 0) {
+            text.textContent =
+              pending === 1 ? 'Одно изменение ждёт сети' : pending + ' изменения ждут сети';
+            badge.hidden = false;
+          } else {
+            badge.hidden = true;
+          }
+        }
+
+        // Запрос ушёл в очередь: строку не трогаем (воркер прислал
+        // HX-Reswap: none), но помечаем её как неотправленную.
+        document.body.addEventListener('htmx:afterRequest', function (e) {
+          var xhr = e.detail.xhr;
+          if (xhr && xhr.status === 202 && xhr.getResponseHeader('X-Doday-Queued')) {
+            var el = e.detail.elt;
+            if (el && el.closest) {
+              var row = el.closest('[id^="task-"]') || el;
+              row.style.opacity = '0.55';
+              row.setAttribute('title', 'Сохранится, когда появится сеть');
+            }
+          }
+        });
+
+        navigator.serviceWorker &&
+          navigator.serviceWorker.addEventListener('message', function (e) {
+            if (!e.data || e.data.type !== 'outbox') return;
+            show(e.data.pending);
+            // Очередь ушла целиком — перечитываем страницу, чтобы увидеть
+            // настоящее состояние с сервера, а не наши пометки.
+            if (e.data.pending === 0 && e.data.sent > 0) window.location.reload();
+          });
+
+        // Safari не умеет Background Sync, поэтому подталкиваем отправку сами.
+        window.addEventListener('online', function () {
+          navigator.serviceWorker &&
+            navigator.serviceWorker.ready.then(function (r) {
+              r.active && r.active.postMessage({ type: 'flush' });
+            });
+        });
+      })();
+    </script>
+    {% endif %}
+
     {% block layout %}
       <main id="main-content" class="max-w-2xl mx-auto p-6 animate-fade-in">
         {% block content %}{% endblock %}

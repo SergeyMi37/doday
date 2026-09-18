@@ -57,10 +57,47 @@ def _row_response(
     )
 
 
+@router.post("/tasks/{task_id}/state", response_class=HTMLResponse)
+async def set_task_state(
+    request: Request,
+    task_id: UUID,
+    user: RequiredUser,
+    session: DbSession,
+    completed: Annotated[str, Form()],
+) -> Response:
+    """Поставить задаче конкретное состояние: выполнена или нет.
+
+    Интерфейс шлёт сюда не «переключи», а «сделай выполненной». Разница
+    видна, когда запрос повторяется: связь пропала на секунду, браузер (или
+    наша очередь неотправленного) шлёт его второй раз — и «переключи»
+    возвращает задачу обратно в невыполненные, а «сделай выполненной»
+    оставляет как есть.
+
+    То же самое с повторяющимися задачами: у «переключи» второй запрос
+    создал бы ещё один следующий экземпляр.
+    """
+    want_done = completed.lower() in ("1", "true", "on", "yes")
+    try:
+        task = await get_task(session, user.id, task_id)
+        if task.is_completed != want_done:
+            task = await (complete_task if want_done else uncomplete_task)(
+                session, user.id, task_id
+            )
+    except TaskNotFound as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "задача не найдена") from e
+
+    return _row_response(request, task, await _project_color_map(session, user.id))
+
+
 @router.post("/tasks/{task_id}/toggle", response_class=HTMLResponse)
 async def toggle_task(
     request: Request, task_id: UUID, user: RequiredUser, session: DbSession
 ) -> Response:
+    """Переключить состояние задачи.
+
+    Оставлено для страниц, открытых до перехода на `/state`, и для внешних
+    вызовов. Повторять этот запрос нельзя — см. `set_task_state`.
+    """
     try:
         task = await get_task(session, user.id, task_id)
     except TaskNotFound as e:

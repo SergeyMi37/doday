@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.achievements.router import router as achievements_router
@@ -47,6 +48,7 @@ from app.game.router import router as game_router
 from app.habits.router import router as habits_router
 from app.help.router import router as help_router
 from app.hub.router import router as hub_router
+from app.idempotency.middleware import idempotency_middleware
 from app.labels.router import router as labels_router
 from app.labels.router import task_labels_router
 from app.lessio.admin import router as lessio_admin_router
@@ -306,6 +308,8 @@ def _privacy_cleanup_on_startup() -> None:
     2. Аккаунты, которые никто не подтвердил и в которых нет ни одной задачи,
        ни привязки к Telegram, ни профиля репетитора, через месяц удаляются:
        это следы ботов и случайных заходов, и хранить их не за чем.
+    3. Ключи идемпотентности старше суток: повторять запрос дольше уже
+       бессмысленно, а таблица растёт с каждым действием.
 
     Выполняется при старте — то есть на каждом деплое. Ошибку логируем,
     сервис из-за неё не падает.
@@ -339,6 +343,13 @@ def _privacy_cleanup_on_startup() -> None:
                         "(SELECT 1 FROM lessio_tutor_profiles p WHERE p.user_id = u.id)"
                     )
                 )
+                # Ключи идемпотентности. Смысл у них короткий: клиент
+                # повторяет неотправленный запрос минуты, в худшем случае —
+                # часы. Через сутки ключ уже никому не нужен, а таблица
+                # растёт с каждым действием в приложении.
+                await conn.execute(
+                    text("DELETE FROM idempotency_keys WHERE created_at < now() - interval '1 day'")
+                )
         finally:
             await engine.dispose()
 
@@ -363,6 +374,12 @@ app = FastAPI(
     redoc_url=None if _is_prod else "/redoc",
     openapi_url=None if _is_prod else "/openapi.json",
 )
+
+# Идемпотентность повторных запросов. Регистрируется ДО SessionMiddleware
+# намеренно: Starlette вставляет каждый следующий middleware снаружи
+# предыдущего, поэтому добавленный позже не увидит request.session — а нам
+# нужно знать, чей это запрос, чтобы ключи разных людей не пересекались.
+app.add_middleware(BaseHTTPMiddleware, dispatch=idempotency_middleware)
 
 app.add_middleware(
     SessionMiddleware,
@@ -1116,33 +1133,17 @@ async def pwa_manifest() -> Response:
 
 @app.get("/service-worker.js")
 async def pwa_service_worker() -> Response:
-    body = """// Doday service worker — minimal cache-first for the app shell, network for everything else.
-const CACHE = 'doday-shell-v1';
-const SHELL = ['/app/today', '/manifest.webmanifest'];
+    """Отдаём воркер из файла, а не строкой в коде.
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => null)).then(() => self.skipWaiting()));
-});
+    Он вырос: кроме кеша оболочки там теперь очередь неотправленных действий,
+    и держать полторы сотни строк JavaScript внутри питоновской строки — это
+    гарантированно не заметить в нём опечатку.
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
-  // Never cache the API.
-  if (new URL(req.url).pathname.startsWith('/api/')) return;
-  e.respondWith(
-    fetch(req).then(r => {
-      const copy = r.clone();
-      caches.open(CACHE).then(c => c.put(req, copy)).catch(() => null);
-      return r;
-    }).catch(() => caches.match(req).then(c => c || new Response('Offline', {status: 503})))
-  );
-});
-"""
-    return Response(content=body, media_type="application/javascript")
+    Путь обязан быть корневым: область действия воркера ограничена каталогом,
+    из которого он отдан, а нам нужно всё приложение.
+    """
+    return FileResponse(
+        "app/static/service-worker.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )

@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Хабр: запросы, которые не дошли</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 760px; margin: 0 auto; padding: 1em; line-height: 1.6; color: #222; background: #fafafa; }
+  .toolbar { position: sticky; top: 0; z-index: 10; background: #fafafa; padding: 1em 0; border-bottom: 1px solid #ddd; margin-bottom: 1em; display: flex; gap: 0.6em; align-items: center; flex-wrap: wrap; }
+  .toolbar button { padding: 0.6em 1.2em; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 0.95em; transition: all 0.15s; }
+  .btn-primary { background: #1a73e8; color: white; }
+  .btn-primary:hover { background: #1557b0; }
+  .btn-primary.ok { background: #16a34a; }
+  .hint { font-size: 0.85em; color: #666; }
+  .instructions { background: #fffbea; border-left: 4px solid #f59e0b; padding: 1em 1.2em; margin: 1em 0 2em; border-radius: 4px; font-size: 0.92em; }
+  .instructions h3 { margin-top: 0; color: #92400e; font-size: 1.1em; }
+  .instructions ol { padding-left: 1.4em; margin: 0.5em 0; }
+  .checklist { background: #ecfdf5; border-left: 4px solid #10b981; padding: 1em 1.2em; margin: 1em 0 2em; border-radius: 4px; font-size: 0.92em; }
+  .checklist h3 { margin-top: 0; color: #065f46; font-size: 1.05em; }
+  .checklist ol { padding-left: 1.4em; margin: 0.5em 0; list-style: decimal; }
+  .checklist input[type="checkbox"] { margin-right: 0.4em; vertical-align: middle; }
+  .checklist code { background: #fff; padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.95em; }
+  .article { background: white; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .article h1 { font-size: 1.8em; border-bottom: 2px solid #eee; padding-bottom: 0.3em; margin-top: 0; }
+  .article h2 { font-size: 1.4em; margin-top: 1.8em; border-bottom: 1px solid #eee; padding-bottom: 0.2em; }
+  .article h3 { font-size: 1.15em; }
+  .section-card { background: white; border-radius: 8px; padding: 1em 1.5em; margin-bottom: 1em; box-shadow: 0 1px 4px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; }
+  .section-header { display: flex; align-items: center; gap: 0.75em; padding-bottom: 0.6em; border-bottom: 1px solid #eee; margin-bottom: 1em; flex-wrap: wrap; }
+  .section-num { display: inline-flex; align-items: center; justify-content: center; width: 1.8em; height: 1.8em; background: #2563eb; color: white; border-radius: 50%; font-weight: 700; font-size: 0.85em; flex-shrink: 0; }
+  .section-title { flex: 1; font-weight: 600; min-width: 0; }
+  .btn-copy-section { padding: 0.5em 1em; border-radius: 6px; border: 1px solid #2563eb; background: white; color: #2563eb; cursor: pointer; font-weight: 600; font-size: 0.88em; transition: all 0.15s; flex-shrink: 0; }
+  .btn-copy-section:hover { background: #2563eb; color: white; }
+  .btn-copy-section.ok { background: #16a34a; color: white; border-color: #16a34a; }
+  .section-body { font-size: 0.95em; line-height: 1.6; color: #444; }
+  .section-body h2 { font-size: 1.3em; margin: 0 0 0.5em 0; color: #1e293b; }
+  .section-body p { margin: 0.5em 0; }
+  .section-body code { background: #f4f4f4; padding: 0.1em 0.3em; border-radius: 3px; }
+  .section-body a { color: #2563eb; }
+  .article code { background: #f4f4f4; padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.92em; }
+  .article pre { background: #f4f4f4; padding: 1em; overflow-x: auto; border-radius: 4px; }
+  .article blockquote { border-left: 4px solid #ccc; padding-left: 1em; color: #555; margin-left: 0; }
+  .article table { border-collapse: collapse; width: 100%; }
+  .article th, .article td { border: 1px solid #ddd; padding: 0.5em 0.8em; text-align: left; }
+  .article th { background: #f4f4f4; }
+  .article a { color: #0066cc; }
+  .article ul, .article ol { padding-left: 1.4em; }
+  .article li { margin: 0.25em 0; }
+  .article hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button id="copy-btn" class="btn-primary" onclick="copyPost()">📋 Скопировать пост</button>
+  <span class="hint">→ Вставь Ctrl+V в редактор Хабр</span>
+</div>
+
+<div class="instructions">
+<h3>Как опубликовать</h3>
+<ol>
+<li>Жми синюю кнопку <strong>«📋 Скопировать пост»</strong> сверху.</li>
+<li>В редакторе Хабр удали старый текст если был, нажми <code>Ctrl+V</code>.</li>
+<li><strong>Важная особенность:</strong> Откройте страницу /raw, скопируйте Markdown целиком и вставьте в Markdown-режим редактора Хабра. Картинок в тексте нет — нужна только обложка 780×440 из docs/habr-screenshots/cover-offline-780x440.png.</li>
+<li>Используй чек-лист ниже чтобы не забыть ни один заголовок.</li>
+</ol>
+</div>
+
+<div class="checklist">
+<h3>Чек-лист: заголовки которые нужно сделать H2 в редакторе Хабр</h3>
+<p style="margin: 0 0 0.6em 0;">После вставки найди эти заголовки (они будут как обычный текст), выдели каждый, нажми «H2» в панели форматирования:</p>
+<ol>
+<li><label><input type="checkbox" class="hl-check"> <code>Что на самом деле происходит при обрыве</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Шаг 1: сначала ручки, потом транспорт</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Шаг 2: Idempotency-Key — имя для запроса</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Шаг 3: очередь в браузере</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Как это проверять</code></label></li>
+<li><label><input type="checkbox" class="hl-check"> <code>Когда всё это не нужно</code></label></li>
+</ol>
+<p style="margin: 0.6em 0 0 0; font-size: 0.85em; color: #666;">Галочки сохранятся пока ты не закроешь страницу. Клики на этой странице ничего не делают с самим постом — это просто блокнот для тебя.</p>
+</div>
+
+<div style="background: #eff6ff; border-left: 4px solid #2563eb; padding: 1em 1.2em; margin: 1em 0 2em; border-radius: 4px; font-size: 0.92em;">
+<h3 style="margin-top: 0; color: #1e40af; font-size: 1.05em;">🔥 Если ОДНА большая вставка не работает (VC.ru ругается «слишком много текста»)</h3>
+<p>Копируй по <strong>СЕКЦИЯМ</strong> ниже. Каждая секция = заголовок H2 + параграфы под ним. Жми «📋 Скопировать секцию», вставляй в редактор Хабр, после вставки выдели первую строку (заголовок) и нажми H2 в их панели. Повтори для каждой из 7 секций.</p>
+</div>
+
+<div id="sections-list">
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">1</span>
+    <span class="section-title">Введение (TL;DR + первые параграфы)</span>
+    <button class="btn-copy-section" onclick="copySection('sec-0', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-0"><h1>Запросы, которые не дошли: очередь в браузере и Idempotency-Key на сервере</h1>
+<hr />
+<p>У меня планировщик для школьников. Открывают его с телефона — в школе, где вайфай держится на честном слове, или в метро по дороге домой.</p>
+<p>Сцена, ради которой всё это затевалось: человек открывает список, жмёт на кружок «готово» — и ничего не происходит. Кружок не закрашивается, ошибки нет, вообще ничего. Он жмёт ещё раз. Потом убирает телефон в карман, а вечером видит задачу невыполненной. Или, если повезёт меньше, видит две одинаковые задачи.</p>
+<p>Это не про экзотику вроде «полностью офлайновое приложение». Это про полсекунды без сети в момент, когда запрос уже ушёл, а ответ ещё не вернулся.</p>
+<p>Дальше — что с этим делать: сначала на сервере, потом в браузере. И где я при этом наступил на грабли.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">2</span>
+    <span class="section-title">Что на самом деле происходит при обрыве</span>
+    <button class="btn-copy-section" onclick="copySection('sec-1', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-1"><h2>Что на самом деле происходит при обрыве</h2><p>Клиент отправил POST и не получил ответа. С его точки зрения это одно событие — «ошибка сети». На сервере в этот момент могло произойти три разных вещи:</p>
+<ol>
+<li>запрос не дошёл, ничего не случилось;</li>
+<li>запрос дошёл, работа сделана, но ответ потерялся по дороге обратно;</li>
+<li>запрос дошёл, но упал на середине.</li>
+</ol>
+<p>Различить их клиент не может. Совсем. У него есть только таймаут и пустота.</p>
+<p>Отсюда и тупик. Не повторять — значит терять действия человека в случае (1). Повторять — значит делать работу дважды в случае (2). В списке задач это две одинаковые строки, в интернет-магазине — два заказа, в банке — два перевода.</p>
+<p>Обычно выбирают «не повторять», потому что дубли заметнее. Пропажу человек спишет на себя: «наверное, не нажал».</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">3</span>
+    <span class="section-title">Шаг 1: сначала ручки, потом транспорт</span>
+    <button class="btn-copy-section" onclick="copySection('sec-2', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-2"><h2>Шаг 1: сначала ручки, потом транспорт</h2><p>Прежде чем городить очереди, стоит посмотреть на свои эндпоинты. У меня в коде жила вот такая:</p>
+<pre><code class="language-python">@router.post(&quot;/tasks/{task_id}/toggle&quot;)
+async def toggle_task(task_id: UUID, ...):
+    if task.is_completed:
+        task = await uncomplete_task(session, user.id, task_id)
+    else:
+        task = await complete_task(session, user.id, task_id)
+    return _row_response(...)
+</code></pre>
+<p>Удобно: кнопка одна, состояние сервер вычислит сам. Ровно до первого повтора.</p>
+<p>Повторите <code>toggle</code> — и он отменит действие, которое только что выполнил. Человек отметил задачу, запрос ушёл дважды (нажал два раза, или это сделала за него ваша будущая очередь) — задача снова не выполнена. С точки зрения пользователя приложение просто издевается.</p>
+<p>С повторяющимися задачами хуже. У меня при закрытии такой задачи создаётся следующий экземпляр — «тренировка в следующий понедельник». Два <code>toggle</code> подряд дают: закрыли, создали следующую, открыли обратно, потом снова закрыли и создали ещё одну. Две тренировки в календаре на ровном месте.</p>
+<p>Лечится тем, что клиент перестаёт спрашивать «переключи» и начинает говорить, чего он хочет:</p>
+<pre><code class="language-python">@router.post(&quot;/tasks/{task_id}/state&quot;)
+async def set_task_state(task_id: UUID, completed: Annotated[str, Form()], ...):
+    want_done = completed.lower() in (&quot;1&quot;, &quot;true&quot;, &quot;on&quot;, &quot;yes&quot;)
+    task = await get_task(session, user.id, task_id)
+    if task.is_completed != want_done:
+        task = await (complete_task if want_done else uncomplete_task)(
+            session, user.id, task_id
+        )
+    return _row_response(...)
+</code></pre>
+<p>Разница в две строчки, а свойство появилось важное: сколько раз ни повтори — результат один и тот же. Проверка <code>if task.is_completed != want_done</code> тут не для экономии запроса к базе, а чтобы повтор не создал второй экземпляр повторяющейся задачи.</p>
+<p>В шаблоне кнопка теперь шлёт желаемое состояние:</p>
+<pre><code class="language-html">hx-post=&quot;/htmx/tasks/{{ task.id }}/state&quot;
+hx-vals='{&quot;completed&quot;: &quot;{{ &quot;false&quot; if task.is_completed else &quot;true&quot; }}&quot;}'
+</code></pre>
+<p>Это самая дешёвая часть всей истории, и она полезна сама по себе — даже если никакой очереди вы делать не будете. <code>PUT</code>-подобные ручки («сделай так») переживают повтор, <code>POST</code>-подобные («переключи», «добавь ещё один») — нет.</p>
+<p>Но с созданием сущности фокус не проходит. «Добавь задачу „купить тетрадь“» — это не описание состояния, это действие. Две одинаковые задачи — совершенно законный результат, если человек правда добавил две. Здесь нужен другой механизм.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">4</span>
+    <span class="section-title">Шаг 2: Idempotency-Key — имя для запроса</span>
+    <button class="btn-copy-section" onclick="copySection('sec-3', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-3"><h2>Шаг 2: Idempotency-Key — имя для запроса</h2><p>Идея простая: пусть клиент сам придумает запросу имя и повторяет его под этим же именем. Сервер выполняет работу только под первым именем, на повторы отдаёт сохранённый ответ.</p>
+<p>Так устроены платёжные API — Stripe, YooKassa и прочие требуют <code>Idempotency-Key</code> ровно по этой причине. Цена задвоения там просто выше, чем раздражение.</p>
+<p>Таблица под это нужна такая:</p>
+<pre><code class="language-python">class IdempotencyKey(Base):
+    __tablename__ = &quot;idempotency_keys&quot;
+    __table_args__ = (UniqueConstraint(&quot;user_id&quot;, &quot;key&quot;, name=&quot;uq_idempotency_user_key&quot;),)
+
+    key: Mapped[str] = mapped_column(String(80), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey(&quot;users.id&quot;, ondelete=&quot;CASCADE&quot;))
+    method: Mapped[str] = mapped_column(String(10))
+    path: Mapped[str] = mapped_column(String(300))
+    completed_at: Mapped[datetime | None]
+    status_code: Mapped[int | None]
+    body: Mapped[str | None]
+    created_at: Mapped[datetime]
+</code></pre>
+<p>Три вещи, ради которых стоило это писать.</p>
+<p><strong>Строка создаётся до выполнения работы и служит замком.</strong> Не после — до. Уникальный индекс <code>(user_id, key)</code> решает, кто из одновременно прилетевших запросов делает работу, а кто ждёт:</p>
+<pre><code class="language-python">inserted = await session.execute(
+    pg_insert(IdempotencyKey)
+    .values(key=key, user_id=user_id, method=request.method, path=path)
+    .on_conflict_do_nothing(index_elements=[&quot;user_id&quot;, &quot;key&quot;])
+    .returning(IdempotencyKey.id)
+)
+row_id = inserted.scalar_one_or_none()
+await session.commit()
+</code></pre>
+<p>Если <code>row_id</code> пустой — строку создал кто-то другой. Дальше два случая: работа уже закончена (<code>completed_at</code> заполнен) — отдаём сохранённый ответ; работа ещё идёт — отвечаем <code>409</code> и заголовком <code>Retry-After</code>. Просить клиента зайти попозже честнее, чем выполнять вторую копию той же работы.</p>
+<p>Обратите внимание: замок — это строка в таблице, а не блокировка. Транзакция коммитится сразу, до вызова обработчика, поэтому никакие локи во время долгой работы не висят.</p>
+<p><strong>Ключ принадлежит пользователю.</strong> Пара <code>(user_id, key)</code>, а не просто <code>key</code>. Иначе я подберу чужой ключ и получу чужой ответ — там HTML с чужими задачами.</p>
+<p><strong>После 5xx ключ надо отпустить.</strong> Это неочевидная часть. Если обработчик упал с 500, работа, скорее всего, не сделана — и повтор должен быть настоящим повтором, а не «уже выполнено, вот вам пустота»:</p>
+<pre><code class="language-python">if response.status_code &gt;= 500:
+    # Сервер упал — работа, скорее всего, не сделана. Ключ убираем,
+    # чтобы повтор был настоящим повтором, а не «уже выполнено».
+    await session.delete(row)
+</code></pre>
+<p>«Скорее всего» здесь честное слово. Строго говоря, 500 мог случиться после того, как задача создалась. Стопроцентной гарантии без распределённых транзакций не бывает; выбор между «иногда дубль после падения сервера» и «иногда молча потерянное действие» я сделал в пользу первого.</p>
+<p>Ещё один случай: тот же ключ пришёл на другую ручку. Это не повтор, это ошибка клиента — отвечаю <code>422</code>, чтобы она не превратилась в загадочный баг через полгода.</p>
+<p>Живут ключи сутки. Клиент повторяет неотправленное минуты, в плохом случае — часы; через сутки ключ уже никому не нужен, а таблица растёт с каждым действием в приложении. Уборка — одна строка в том же месте, где чистится остальное:</p>
+<pre><code class="language-sql">DELETE FROM idempotency_keys WHERE created_at &lt; now() - interval '1 day'
+</code></pre>
+<h3>Грабли: middleware, который не видит сессию</h3>
+<p>Реализовать это зависимостью FastAPI не получится: зависимость видит запрос до обработчика и не может подменить результат. А нам нужен готовый ответ, чтобы сохранить его для повторов. Значит, middleware.</p>
+<p>И вот тут я потерял полчаса. Регистрируешь middleware как обычно — и <code>request.session</code> внутри падает с <code>AssertionError</code>.</p>
+<p>Дело в порядке. Starlette вставляет каждый следующий middleware <strong>снаружи</strong> предыдущего: добавленный позже оборачивает добавленных раньше. <code>SessionMiddleware</code> в моём <code>main.py</code> стоял первым, значит все мои <code>@app.middleware("http")</code> оказались снаружи — и работали до того, как сессия вообще появилась в запросе.</p>
+<p>Проверяется за минуту:</p>
+<pre><code class="language-python">app.add_middleware(SessionMiddleware, secret_key=&quot;x&quot;)
+
+@app.middleware(&quot;http&quot;)
+async def mw(request, call_next):
+    request.session   # AssertionError: SessionMiddleware must be installed
+    return await call_next(request)
+</code></pre>
+<p>Лечится переносом регистрации на строку выше <code>SessionMiddleware</code>. Я оставил в коде комментарий, потому что через месяц кто-нибудь (я) переставит строки местами и будет искать причину заново.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">5</span>
+    <span class="section-title">Шаг 3: очередь в браузере</span>
+    <button class="btn-copy-section" onclick="copySection('sec-4', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-4"><h2>Шаг 3: очередь в браузере</h2><p>Теперь сервер готов принимать повторы. Осталось, чтобы кто-то их делал.</p>
+<p>Этим занимается service worker: он видит все запросы страницы и может ответить на них сам. Логика на словах — «попробуй отправить, а если сеть отказала, положи в коробку и скажи странице, что мы запомнили»:</p>
+<pre><code class="language-js">e.respondWith(
+  fetch(req).catch(async () =&gt; {
+    const body = await copy.text();
+    await enqueue({ url: req.url, method: req.method, headers, body, at: Date.now() });
+    await tellPages({ type: 'outbox', pending: (await allQueued()).length });
+    if ('sync' in self.registration) {
+      try { await self.registration.sync.register(SYNC_TAG); } catch (err) {}
+    }
+    return new Response('', {
+      status: 202,
+      headers: { 'X-Doday-Queued': '1', 'HX-Reswap': 'none' },
+    });
+  })
+);
+</code></pre>
+<p>Несколько мест, где легко ошибиться.</p>
+<p><strong>Тело запроса читается один раз.</strong> <code>req.clone()</code> надо сделать до того, как запрос ушёл в <code>fetch</code>, иначе в обработчике ошибки читать будет уже нечего.</p>
+<p><strong>Хранить очередь надо в IndexedDB.</strong> Не потому что она лучше, а потому что <code>localStorage</code> синхронный и в service worker недоступен в принципе.</p>
+<p><strong>Порядок имеет значение.</strong> Если сеть отвалилась посреди отправки очереди — останавливаемся и ждём следующего раза, а не пытаемся отправить остальное:</p>
+<pre><code class="language-js">} catch (e) {
+  // Сеть снова пропала. Остальное ждёт следующего раза — порядок
+  // важен: «создать задачу» должно уйти раньше «отметить её».
+  break;
+}
+</code></pre>
+<p>То же самое при <code>409</code> (первый такой же запрос ещё выполняется) и при <code>5xx</code>. А вот <code>4xx</code> — это окончательный отказ: задачу, например, успели удалить с другого устройства. Такой запрос из очереди убираем, повторять его бессмысленно.</p>
+<p><strong>Background Sync есть не везде.</strong> Браузер умеет сам разбудить воркер, когда сеть вернётся, — но в Safari этого API нет до сих пор. Поэтому страница дополнительно слушает событие <code>online</code> и толкает воркер сама:</p>
+<pre><code class="language-js">window.addEventListener('online', function () {
+  navigator.serviceWorker.ready.then(function (r) {
+    r.active &amp;&amp; r.active.postMessage({ type: 'flush' });
+  });
+});
+</code></pre>
+<p><strong>Человеку надо сказать, что происходит.</strong> Молчаливая очередь ничем не лучше молчаливой потери: пользователь всё равно не знает, сохранилось или нет. У меня это полоска внизу экрана — «Одно изменение ждёт сети», — которая исчезает, когда очередь ушла.</p>
+<h3>Грабли: htmx и ответ, которого он не ждал</h3>
+<p>У меня интерфейс на htmx: кнопка шлёт POST и подставляет пришедший HTML на место строки задачи. Ответ «положили в очередь» никакого HTML не содержит — и первая же версия честно стёрла строку задачи с экрана. Человек нажал «готово», и задача исчезла вообще.</p>
+<p>Спасает заголовок <code>HX-Reswap: none</code> — им сервер (в нашем случае воркер) говорит htmx: ответ получен, подставлять ничего не надо. Строка остаётся на месте, а страница помечает её как неотправленную.</p>
+<h3>Грабли: воркер, который сломал мне CDN</h3>
+<p>Самое обидное я нашёл тестом. Первая версия обработчика <code>fetch</code> перехватывала <strong>все</strong> GET-запросы, включая <code>unpkg.com</code> и <code>cdn.tailwindcss.com</code>. Логика была «сходи в сеть, не вышло — отдай из кеша, не вышло — отдай 503».</p>
+<p>Работает, пока CDN отвечает. А прогонял я тест в окружении, где внешние адреса недоступны, — и случилось вот что: htmx не загрузился, потому что мой же воркер вернул на него <code>503</code>. Кнопки перестали быть кнопками. При этом собственный сайт открывался нормально — и со стороны это выглядело как «htmx сломался».</p>
+<p>Мораль простая: чужие домены не ваше дело.</p>
+<pre><code class="language-js">if (url.origin !== self.location.origin) return;
+</code></pre>
+<p>Одна строка, а без неё любой сбой у стороннего CDN превращается в отказ вашего приложения — причём в такой, который вы будете искать в своём коде.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">6</span>
+    <span class="section-title">Как это проверять</span>
+    <button class="btn-copy-section" onclick="copySection('sec-5', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-5"><h2>Как это проверять</h2><p>Тесты на сервер очевидны — берём один и тот же ключ и смотрим, сколько задач получилось:</p>
+<pre><code class="language-python">async def test_repeat_with_same_key_creates_one_task(logged_in_client, db_session):
+    payload = {&quot;text&quot;: &quot;Купить тетрадь&quot;}
+    headers = {&quot;Idempotency-Key&quot;: &quot;key-abc-123&quot;}
+
+    first = await logged_in_client.post(&quot;/htmx/quickadd&quot;, data=payload, headers=headers)
+    second = await logged_in_client.post(&quot;/htmx/quickadd&quot;, data=payload, headers=headers)
+
+    assert second.text == first.text                      # ответ тот же, а не новый
+    assert second.headers.get(&quot;Idempotency-Replayed&quot;) == &quot;1&quot;
+    assert await _task_count(db_session, &quot;Купить тетрадь&quot;) == 1
+</code></pre>
+<p>А вот очередь тестом на сервере не проверишь никак: она целиком живёт в браузере. Playwright умеет выключать сеть у контекста, и это ровно то, что нужно:</p>
+<pre><code class="language-js">await ctx.setOffline(true);
+await circle.click();                       // жмём «готово» без сети
+// значок появился, запрос лёг в IndexedDB
+await ctx.setOffline(false);
+await page.evaluate(() =&gt; window.dispatchEvent(new Event('online')));
+</code></pre>
+<p>Вывод такого прогона выглядит так:</p>
+<pre><code>воркер управляет страницей: true
+— сеть выключена —
+  [ответ] 202 /htmx/tasks/47583447-.../state
+значок очереди виден: true | Одно изменение ждёт сети
+в очереди: [&quot;POST /htmx/tasks/47583447-.../state&quot;]
+— сеть включена —
+осталось в очереди: 0
+</code></pre>
+<p>И финальная проверка — в базе, а не на экране:</p>
+<pre><code>        title         | is_completed
+----------------------+--------------
+ Физика: задачи 12–15 | t
+</code></pre>
+<p>Именно этот тест и нашёл историю с CDN. Пока я кликал руками в обычном браузере, всё работало.</p></div>
+</div>
+<div class="section-card">
+  <div class="section-header">
+    <span class="section-num">7</span>
+    <span class="section-title">Когда всё это не нужно</span>
+    <button class="btn-copy-section" onclick="copySection('sec-6', this)">📋 Скопировать секцию</button>
+  </div>
+  <div class="section-body" id="sec-6"><h2>Когда всё это не нужно</h2><p>Не надо делать очередь, если действия пользователя — только чтение. Список, который не открылся, человек просто откроет ещё раз; хранить нечего.</p>
+<p>Не надо повторять то, что имеет смысл только сейчас. Вход, оплата, отправка кода из СМС — запрос, который доехал через сорок минут, скорее навредит. У меня такие пути прямо исключены из очереди:</p>
+<pre><code class="language-js">return !/^\/(auth|api\/billing|miniapp\/auth)/.test(url.pathname);
+</code></pre>
+<p>И это не полноценная офлайн-синхронизация. Тут нет разрешения конфликтов: если задачу поменяли на двух устройствах, победит тот, чей запрос дошёл позже. Для планировщика этого достаточно — а если вам нужно больше, вы уже смотрите в сторону CRDT, и это разговор другого масштаба и другой цены.</p>
+<p>Порядок, в котором я бы это делал заново:</p>
+<ol>
+<li>Убрать из API ручки вида «переключи». Бесплатно, полезно сразу, ничего не ломает.</li>
+<li>Добавить <code>Idempotency-Key</code> там, где создаются сущности. День работы, зато повторы становятся безопасными — и не только из очереди, но и от двойного клика.</li>
+<li>И только потом — очередь в браузере. Без первых двух пунктов она превращается в машину по производству дублей.</li>
+</ol>
+<p>Код проекта открыт: <a href="https://github.com/SwairIt/doday">github.com/SwairIt/doday</a> — там и middleware, и воркер целиком. Сам проект — <a href="https://getdoday.ru/">getdoday.ru</a>.</p>
+<p>Ярослав Боев.</p></div>
+</div>
+
+</div>
+
+<details style="margin-top: 2em; background: white; padding: 1em 1.5em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+<summary style="cursor: pointer; font-weight: 600; color: #1a73e8;">Запасной запасной вариант: plain text с маркерами заголовков</summary>
+<p style="margin: 1em 0 0.6em 0; font-size: 0.92em; color: #555;">
+Если совсем ничего не работает — выдели текст ниже (клик в поле → Ctrl+A → Ctrl+C) и вставь в редактор Хабр.
+Заголовки помечены ▶ <code>═══ H2: ... ═══</code> ◀ — найди каждый в редакторе, выдели, нажми H2, удали маркеры.
+</p>
+<textarea readonly id="plain-textarea" style="width: 100%; height: 400px; font-family: 'SF Mono', Consolas, monospace; font-size: 0.85em; padding: 1em; border: 1px solid #ddd; border-radius: 4px; resize: vertical; line-height: 1.5;" onclick="this.select()">ЗАПРОСЫ, КОТОРЫЕ НЕ ДОШЛИ: ОЧЕРЕДЬ В БРАУЗЕРЕ И IDEMPOTENCY-KEY НА СЕРВЕРЕ
+
+
+---
+
+У меня планировщик для школьников. Открывают его с телефона — в школе, где вайфай держится на честном слове, или в метро по дороге домой.
+
+Сцена, ради которой всё это затевалось: человек открывает список, жмёт на кружок «готово» — и ничего не происходит. Кружок не закрашивается, ошибки нет, вообще ничего. Он жмёт ещё раз. Потом убирает телефон в карман, а вечером видит задачу невыполненной. Или, если повезёт меньше, видит две одинаковые задачи.
+
+Это не про экзотику вроде «полностью офлайновое приложение». Это про полсекунды без сети в момент, когда запрос уже ушёл, а ответ ещё не вернулся.
+
+Дальше — что с этим делать: сначала на сервере, потом в браузере. И где я при этом наступил на грабли.
+
+
+═══ H2: Что на самом деле происходит при обрыве ═══
+
+
+Клиент отправил POST и не получил ответа. С его точки зрения это одно событие — «ошибка сети». На сервере в этот момент могло произойти три разных вещи:
+
+1. запрос не дошёл, ничего не случилось;
+2. запрос дошёл, работа сделана, но ответ потерялся по дороге обратно;
+3. запрос дошёл, но упал на середине.
+
+Различить их клиент не может. Совсем. У него есть только таймаут и пустота.
+
+Отсюда и тупик. Не повторять — значит терять действия человека в случае (1). Повторять — значит делать работу дважды в случае (2). В списке задач это две одинаковые строки, в интернет-магазине — два заказа, в банке — два перевода.
+
+Обычно выбирают «не повторять», потому что дубли заметнее. Пропажу человек спишет на себя: «наверное, не нажал».
+
+
+═══ H2: Шаг 1: сначала ручки, потом транспорт ═══
+
+
+Прежде чем городить очереди, стоит посмотреть на свои эндпоинты. У меня в коде жила вот такая:
+
+`python
+@router.post("/tasks/{task_id}/toggle")
+async def toggle_task(task_id: UUID, ...):
+    if task.is_completed:
+        task = await uncomplete_task(session, user.id, task_id)
+    else:
+        task = await complete_task(session, user.id, task_id)
+    return _row_response(...)
+`
+
+Удобно: кнопка одна, состояние сервер вычислит сам. Ровно до первого повтора.
+
+Повторите toggle — и он отменит действие, которое только что выполнил. Человек отметил задачу, запрос ушёл дважды (нажал два раза, или это сделала за него ваша будущая очередь) — задача снова не выполнена. С точки зрения пользователя приложение просто издевается.
+
+С повторяющимися задачами хуже. У меня при закрытии такой задачи создаётся следующий экземпляр — «тренировка в следующий понедельник». Два toggle подряд дают: закрыли, создали следующую, открыли обратно, потом снова закрыли и создали ещё одну. Две тренировки в календаре на ровном месте.
+
+Лечится тем, что клиент перестаёт спрашивать «переключи» и начинает говорить, чего он хочет:
+
+`python
+@router.post("/tasks/{task_id}/state")
+async def set_task_state(task_id: UUID, completed: Annotated[str, Form()], ...):
+    want_done = completed.lower() in ("1", "true", "on", "yes")
+    task = await get_task(session, user.id, task_id)
+    if task.is_completed != want_done:
+        task = await (complete_task if want_done else uncomplete_task)(
+            session, user.id, task_id
+        )
+    return _row_response(...)
+`
+
+Разница в две строчки, а свойство появилось важное: сколько раз ни повтори — результат один и тот же. Проверка if task.is_completed != want_done тут не для экономии запроса к базе, а чтобы повтор не создал второй экземпляр повторяющейся задачи.
+
+В шаблоне кнопка теперь шлёт желаемое состояние:
+
+`html
+hx-post="/htmx/tasks/{{ task.id }}/state"
+hx-vals='{"completed": "{{ "false" if task.is_completed else "true" }}"}'
+`
+
+Это самая дешёвая часть всей истории, и она полезна сама по себе — даже если никакой очереди вы делать не будете. PUT-подобные ручки («сделай так») переживают повтор, POST-подобные («переключи», «добавь ещё один») — нет.
+
+Но с созданием сущности фокус не проходит. «Добавь задачу „купить тетрадь“» — это не описание состояния, это действие. Две одинаковые задачи — совершенно законный результат, если человек правда добавил две. Здесь нужен другой механизм.
+
+
+═══ H2: Шаг 2: Idempotency-Key — имя для запроса ═══
+
+
+Идея простая: пусть клиент сам придумает запросу имя и повторяет его под этим же именем. Сервер выполняет работу только под первым именем, на повторы отдаёт сохранённый ответ.
+
+Так устроены платёжные API — Stripe, YooKassa и прочие требуют Idempotency-Key ровно по этой причине. Цена задвоения там просто выше, чем раздражение.
+
+Таблица под это нужна такая:
+
+`python
+class IdempotencyKey(Base):
+    __tablename__ = "idempotency_keys"
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_idempotency_user_key"),)
+
+    key: Mapped[str] = mapped_column(String(80), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    method: Mapped[str] = mapped_column(String(10))
+    path: Mapped[str] = mapped_column(String(300))
+    completed_at: Mapped[datetime | None]
+    status_code: Mapped[int | None]
+    body: Mapped[str | None]
+    created_at: Mapped[datetime]
+`
+
+Три вещи, ради которых стоило это писать.
+
+Строка создаётся до выполнения работы и служит замком. Не после — до. Уникальный индекс (user_id, key) решает, кто из одновременно прилетевших запросов делает работу, а кто ждёт:
+
+`python
+inserted = await session.execute(
+    pg_insert(IdempotencyKey)
+    .values(key=key, user_id=user_id, method=request.method, path=path)
+    .on_conflict_do_nothing(index_elements=["user_id", "key"])
+    .returning(IdempotencyKey.id)
+)
+row_id = inserted.scalar_one_or_none()
+await session.commit()
+`
+
+Если row_id пустой — строку создал кто-то другой. Дальше два случая: работа уже закончена (completed_at заполнен) — отдаём сохранённый ответ; работа ещё идёт — отвечаем 409 и заголовком Retry-After. Просить клиента зайти попозже честнее, чем выполнять вторую копию той же работы.
+
+Обратите внимание: замок — это строка в таблице, а не блокировка. Транзакция коммитится сразу, до вызова обработчика, поэтому никакие локи во время долгой работы не висят.
+
+Ключ принадлежит пользователю. Пара (user_id, key), а не просто key. Иначе я подберу чужой ключ и получу чужой ответ — там HTML с чужими задачами.
+
+После 5xx ключ надо отпустить. Это неочевидная часть. Если обработчик упал с 500, работа, скорее всего, не сделана — и повтор должен быть настоящим повтором, а не «уже выполнено, вот вам пустота»:
+
+`python
+if response.status_code &gt;= 500:
+    # Сервер упал — работа, скорее всего, не сделана. Ключ убираем,
+    # чтобы повтор был настоящим повтором, а не «уже выполнено».
+    await session.delete(row)
+`
+
+«Скорее всего» здесь честное слово. Строго говоря, 500 мог случиться после того, как задача создалась. Стопроцентной гарантии без распределённых транзакций не бывает; выбор между «иногда дубль после падения сервера» и «иногда молча потерянное действие» я сделал в пользу первого.
+
+Ещё один случай: тот же ключ пришёл на другую ручку. Это не повтор, это ошибка клиента — отвечаю 422, чтобы она не превратилась в загадочный баг через полгода.
+
+Живут ключи сутки. Клиент повторяет неотправленное минуты, в плохом случае — часы; через сутки ключ уже никому не нужен, а таблица растёт с каждым действием в приложении. Уборка — одна строка в том же месте, где чистится остальное:
+
+`sql
+DELETE FROM idempotency_keys WHERE created_at &lt; now() - interval '1 day'
+`
+
+
+── H3: Грабли: middleware, который не видит сессию ──
+
+Реализовать это зависимостью FastAPI не получится: зависимость видит запрос до обработчика и не может подменить результат. А нам нужен готовый ответ, чтобы сохранить его для повторов. Значит, middleware.
+
+И вот тут я потерял полчаса. Регистрируешь middleware как обычно — и request.session внутри падает с AssertionError.
+
+Дело в порядке. Starlette вставляет каждый следующий middleware снаружи предыдущего: добавленный позже оборачивает добавленных раньше. SessionMiddleware в моём main.py стоял первым, значит все мои @app.middleware("http") оказались снаружи — и работали до того, как сессия вообще появилась в запросе.
+
+Проверяется за минуту:
+
+`python
+app.add_middleware(SessionMiddleware, secret_key="x")
+
+@app.middleware("http")
+async def mw(request, call_next):
+    request.session   # AssertionError: SessionMiddleware must be installed
+    return await call_next(request)
+`
+
+Лечится переносом регистрации на строку выше SessionMiddleware. Я оставил в коде комментарий, потому что через месяц кто-нибудь (я) переставит строки местами и будет искать причину заново.
+
+
+═══ H2: Шаг 3: очередь в браузере ═══
+
+
+Теперь сервер готов принимать повторы. Осталось, чтобы кто-то их делал.
+
+Этим занимается service worker: он видит все запросы страницы и может ответить на них сам. Логика на словах — «попробуй отправить, а если сеть отказала, положи в коробку и скажи странице, что мы запомнили»:
+
+`js
+e.respondWith(
+  fetch(req).catch(async () =&gt; {
+    const body = await copy.text();
+    await enqueue({ url: req.url, method: req.method, headers, body, at: Date.now() });
+    await tellPages({ type: 'outbox', pending: (await allQueued()).length });
+    if ('sync' in self.registration) {
+      try { await self.registration.sync.register(SYNC_TAG); } catch (err) {}
+    }
+    return new Response('', {
+      status: 202,
+      headers: { 'X-Doday-Queued': '1', 'HX-Reswap': 'none' },
+    });
+  })
+);
+`
+
+Несколько мест, где легко ошибиться.
+
+Тело запроса читается один раз. req.clone() надо сделать до того, как запрос ушёл в fetch, иначе в обработчике ошибки читать будет уже нечего.
+
+Хранить очередь надо в IndexedDB. Не потому что она лучше, а потому что localStorage синхронный и в service worker недоступен в принципе.
+
+Порядок имеет значение. Если сеть отвалилась посреди отправки очереди — останавливаемся и ждём следующего раза, а не пытаемся отправить остальное:
+
+`js
+} catch (e) {
+  // Сеть снова пропала. Остальное ждёт следующего раза — порядок
+  // важен: «создать задачу» должно уйти раньше «отметить её».
+  break;
+}
+`
+
+То же самое при 409 (первый такой же запрос ещё выполняется) и при 5xx. А вот 4xx — это окончательный отказ: задачу, например, успели удалить с другого устройства. Такой запрос из очереди убираем, повторять его бессмысленно.
+
+Background Sync есть не везде. Браузер умеет сам разбудить воркер, когда сеть вернётся, — но в Safari этого API нет до сих пор. Поэтому страница дополнительно слушает событие online и толкает воркер сама:
+
+`js
+window.addEventListener('online', function () {
+  navigator.serviceWorker.ready.then(function (r) {
+    r.active &amp;&amp; r.active.postMessage({ type: 'flush' });
+  });
+});
+`
+
+Человеку надо сказать, что происходит. Молчаливая очередь ничем не лучше молчаливой потери: пользователь всё равно не знает, сохранилось или нет. У меня это полоска внизу экрана — «Одно изменение ждёт сети», — которая исчезает, когда очередь ушла.
+
+
+── H3: Грабли: htmx и ответ, которого он не ждал ──
+
+У меня интерфейс на htmx: кнопка шлёт POST и подставляет пришедший HTML на место строки задачи. Ответ «положили в очередь» никакого HTML не содержит — и первая же версия честно стёрла строку задачи с экрана. Человек нажал «готово», и задача исчезла вообще.
+
+Спасает заголовок HX-Reswap: none — им сервер (в нашем случае воркер) говорит htmx: ответ получен, подставлять ничего не надо. Строка остаётся на месте, а страница помечает её как неотправленную.
+
+
+── H3: Грабли: воркер, который сломал мне CDN ──
+
+Самое обидное я нашёл тестом. Первая версия обработчика fetch перехватывала все GET-запросы, включая unpkg.com и cdn.tailwindcss.com. Логика была «сходи в сеть, не вышло — отдай из кеша, не вышло — отдай 503».
+
+Работает, пока CDN отвечает. А прогонял я тест в окружении, где внешние адреса недоступны, — и случилось вот что: htmx не загрузился, потому что мой же воркер вернул на него 503. Кнопки перестали быть кнопками. При этом собственный сайт открывался нормально — и со стороны это выглядело как «htmx сломался».
+
+Мораль простая: чужие домены не ваше дело.
+
+`js
+if (url.origin !== self.location.origin) return;
+`
+
+Одна строка, а без неё любой сбой у стороннего CDN превращается в отказ вашего приложения — причём в такой, который вы будете искать в своём коде.
+
+
+═══ H2: Как это проверять ═══
+
+
+Тесты на сервер очевидны — берём один и тот же ключ и смотрим, сколько задач получилось:
+
+`python
+async def test_repeat_with_same_key_creates_one_task(logged_in_client, db_session):
+    payload = {"text": "Купить тетрадь"}
+    headers = {"Idempotency-Key": "key-abc-123"}
+
+    first = await logged_in_client.post("/htmx/quickadd", data=payload, headers=headers)
+    second = await logged_in_client.post("/htmx/quickadd", data=payload, headers=headers)
+
+    assert second.text == first.text                      # ответ тот же, а не новый
+    assert second.headers.get("Idempotency-Replayed") == "1"
+    assert await _task_count(db_session, "Купить тетрадь") == 1
+`
+
+А вот очередь тестом на сервере не проверишь никак: она целиком живёт в браузере. Playwright умеет выключать сеть у контекста, и это ровно то, что нужно:
+
+`js
+await ctx.setOffline(true);
+await circle.click();                       // жмём «готово» без сети
+// значок появился, запрос лёг в IndexedDB
+await ctx.setOffline(false);
+await page.evaluate(() =&gt; window.dispatchEvent(new Event('online')));
+`
+
+Вывод такого прогона выглядит так:
+
+`
+воркер управляет страницей: true
+— сеть выключена —
+  [ответ] 202 /htmx/tasks/47583447-.../state
+значок очереди виден: true | Одно изменение ждёт сети
+в очереди: ["POST /htmx/tasks/47583447-.../state"]
+— сеть включена —
+осталось в очереди: 0
+`
+
+И финальная проверка — в базе, а не на экране:
+
+`
+        title         | is_completed
+----------------------+--------------
+ Физика: задачи 12–15 | t
+`
+
+Именно этот тест и нашёл историю с CDN. Пока я кликал руками в обычном браузере, всё работало.
+
+
+═══ H2: Когда всё это не нужно ═══
+
+
+Не надо делать очередь, если действия пользователя — только чтение. Список, который не открылся, человек просто откроет ещё раз; хранить нечего.
+
+Не надо повторять то, что имеет смысл только сейчас. Вход, оплата, отправка кода из СМС — запрос, который доехал через сорок минут, скорее навредит. У меня такие пути прямо исключены из очереди:
+
+`js
+return !/^\/(auth|api\/billing|miniapp\/auth)/.test(url.pathname);
+`
+
+И это не полноценная офлайн-синхронизация. Тут нет разрешения конфликтов: если задачу поменяли на двух устройствах, победит тот, чей запрос дошёл позже. Для планировщика этого достаточно — а если вам нужно больше, вы уже смотрите в сторону CRDT, и это разговор другого масштаба и другой цены.
+
+Порядок, в котором я бы это делал заново:
+
+1. Убрать из API ручки вида «переключи». Бесплатно, полезно сразу, ничего не ломает.
+2. Добавить Idempotency-Key там, где создаются сущности. День работы, зато повторы становятся безопасными — и не только из очереди, но и от двойного клика.
+3. И только потом — очередь в браузере. Без первых двух пунктов она превращается в машину по производству дублей.
+
+Код проекта открыт: github.com/SwairIt/doday (https://github.com/SwairIt/doday) — там и middleware, и воркер целиком. Сам проект — getdoday.ru (https://getdoday.ru/).
+
+Ярослав Боев.
+</textarea>
+<button onclick="copyPlainText()" style="margin-top: 0.6em; padding: 0.5em 1em; border-radius: 4px; border: 1px solid #1a73e8; background: white; color: #1a73e8; cursor: pointer; font-weight: 600;">📋 Скопировать plain text</button>
+</details>
+
+<details style="margin-top: 1em; background: white; padding: 1em 1.5em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+<summary style="cursor: pointer; font-weight: 600; color: #666;">Предпросмотр всего поста как одной статьи</summary>
+<article class="article" id="article" style="margin-top: 1em;">
+<h1>Запросы, которые не дошли: очередь в браузере и Idempotency-Key на сервере</h1>
+<hr />
+<p>У меня планировщик для школьников. Открывают его с телефона — в школе, где вайфай держится на честном слове, или в метро по дороге домой.</p>
+<p>Сцена, ради которой всё это затевалось: человек открывает список, жмёт на кружок «готово» — и ничего не происходит. Кружок не закрашивается, ошибки нет, вообще ничего. Он жмёт ещё раз. Потом убирает телефон в карман, а вечером видит задачу невыполненной. Или, если повезёт меньше, видит две одинаковые задачи.</p>
+<p>Это не про экзотику вроде «полностью офлайновое приложение». Это про полсекунды без сети в момент, когда запрос уже ушёл, а ответ ещё не вернулся.</p>
+<p>Дальше — что с этим делать: сначала на сервере, потом в браузере. И где я при этом наступил на грабли.</p>
+<h2>Что на самом деле происходит при обрыве</h2>
+<p>Клиент отправил POST и не получил ответа. С его точки зрения это одно событие — «ошибка сети». На сервере в этот момент могло произойти три разных вещи:</p>
+<ol>
+<li>запрос не дошёл, ничего не случилось;</li>
+<li>запрос дошёл, работа сделана, но ответ потерялся по дороге обратно;</li>
+<li>запрос дошёл, но упал на середине.</li>
+</ol>
+<p>Различить их клиент не может. Совсем. У него есть только таймаут и пустота.</p>
+<p>Отсюда и тупик. Не повторять — значит терять действия человека в случае (1). Повторять — значит делать работу дважды в случае (2). В списке задач это две одинаковые строки, в интернет-магазине — два заказа, в банке — два перевода.</p>
+<p>Обычно выбирают «не повторять», потому что дубли заметнее. Пропажу человек спишет на себя: «наверное, не нажал».</p>
+<h2>Шаг 1: сначала ручки, потом транспорт</h2>
+<p>Прежде чем городить очереди, стоит посмотреть на свои эндпоинты. У меня в коде жила вот такая:</p>
+<pre><code class="language-python">@router.post(&quot;/tasks/{task_id}/toggle&quot;)
+async def toggle_task(task_id: UUID, ...):
+    if task.is_completed:
+        task = await uncomplete_task(session, user.id, task_id)
+    else:
+        task = await complete_task(session, user.id, task_id)
+    return _row_response(...)
+</code></pre>
+<p>Удобно: кнопка одна, состояние сервер вычислит сам. Ровно до первого повтора.</p>
+<p>Повторите <code>toggle</code> — и он отменит действие, которое только что выполнил. Человек отметил задачу, запрос ушёл дважды (нажал два раза, или это сделала за него ваша будущая очередь) — задача снова не выполнена. С точки зрения пользователя приложение просто издевается.</p>
+<p>С повторяющимися задачами хуже. У меня при закрытии такой задачи создаётся следующий экземпляр — «тренировка в следующий понедельник». Два <code>toggle</code> подряд дают: закрыли, создали следующую, открыли обратно, потом снова закрыли и создали ещё одну. Две тренировки в календаре на ровном месте.</p>
+<p>Лечится тем, что клиент перестаёт спрашивать «переключи» и начинает говорить, чего он хочет:</p>
+<pre><code class="language-python">@router.post(&quot;/tasks/{task_id}/state&quot;)
+async def set_task_state(task_id: UUID, completed: Annotated[str, Form()], ...):
+    want_done = completed.lower() in (&quot;1&quot;, &quot;true&quot;, &quot;on&quot;, &quot;yes&quot;)
+    task = await get_task(session, user.id, task_id)
+    if task.is_completed != want_done:
+        task = await (complete_task if want_done else uncomplete_task)(
+            session, user.id, task_id
+        )
+    return _row_response(...)
+</code></pre>
+<p>Разница в две строчки, а свойство появилось важное: сколько раз ни повтори — результат один и тот же. Проверка <code>if task.is_completed != want_done</code> тут не для экономии запроса к базе, а чтобы повтор не создал второй экземпляр повторяющейся задачи.</p>
+<p>В шаблоне кнопка теперь шлёт желаемое состояние:</p>
+<pre><code class="language-html">hx-post=&quot;/htmx/tasks/{{ task.id }}/state&quot;
+hx-vals='{&quot;completed&quot;: &quot;{{ &quot;false&quot; if task.is_completed else &quot;true&quot; }}&quot;}'
+</code></pre>
+<p>Это самая дешёвая часть всей истории, и она полезна сама по себе — даже если никакой очереди вы делать не будете. <code>PUT</code>-подобные ручки («сделай так») переживают повтор, <code>POST</code>-подобные («переключи», «добавь ещё один») — нет.</p>
+<p>Но с созданием сущности фокус не проходит. «Добавь задачу „купить тетрадь“» — это не описание состояния, это действие. Две одинаковые задачи — совершенно законный результат, если человек правда добавил две. Здесь нужен другой механизм.</p>
+<h2>Шаг 2: Idempotency-Key — имя для запроса</h2>
+<p>Идея простая: пусть клиент сам придумает запросу имя и повторяет его под этим же именем. Сервер выполняет работу только под первым именем, на повторы отдаёт сохранённый ответ.</p>
+<p>Так устроены платёжные API — Stripe, YooKassa и прочие требуют <code>Idempotency-Key</code> ровно по этой причине. Цена задвоения там просто выше, чем раздражение.</p>
+<p>Таблица под это нужна такая:</p>
+<pre><code class="language-python">class IdempotencyKey(Base):
+    __tablename__ = &quot;idempotency_keys&quot;
+    __table_args__ = (UniqueConstraint(&quot;user_id&quot;, &quot;key&quot;, name=&quot;uq_idempotency_user_key&quot;),)
+
+    key: Mapped[str] = mapped_column(String(80), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey(&quot;users.id&quot;, ondelete=&quot;CASCADE&quot;))
+    method: Mapped[str] = mapped_column(String(10))
+    path: Mapped[str] = mapped_column(String(300))
+    completed_at: Mapped[datetime | None]
+    status_code: Mapped[int | None]
+    body: Mapped[str | None]
+    created_at: Mapped[datetime]
+</code></pre>
+<p>Три вещи, ради которых стоило это писать.</p>
+<p><strong>Строка создаётся до выполнения работы и служит замком.</strong> Не после — до. Уникальный индекс <code>(user_id, key)</code> решает, кто из одновременно прилетевших запросов делает работу, а кто ждёт:</p>
+<pre><code class="language-python">inserted = await session.execute(
+    pg_insert(IdempotencyKey)
+    .values(key=key, user_id=user_id, method=request.method, path=path)
+    .on_conflict_do_nothing(index_elements=[&quot;user_id&quot;, &quot;key&quot;])
+    .returning(IdempotencyKey.id)
+)
+row_id = inserted.scalar_one_or_none()
+await session.commit()
+</code></pre>
+<p>Если <code>row_id</code> пустой — строку создал кто-то другой. Дальше два случая: работа уже закончена (<code>completed_at</code> заполнен) — отдаём сохранённый ответ; работа ещё идёт — отвечаем <code>409</code> и заголовком <code>Retry-After</code>. Просить клиента зайти попозже честнее, чем выполнять вторую копию той же работы.</p>
+<p>Обратите внимание: замок — это строка в таблице, а не блокировка. Транзакция коммитится сразу, до вызова обработчика, поэтому никакие локи во время долгой работы не висят.</p>
+<p><strong>Ключ принадлежит пользователю.</strong> Пара <code>(user_id, key)</code>, а не просто <code>key</code>. Иначе я подберу чужой ключ и получу чужой ответ — там HTML с чужими задачами.</p>
+<p><strong>После 5xx ключ надо отпустить.</strong> Это неочевидная часть. Если обработчик упал с 500, работа, скорее всего, не сделана — и повтор должен быть настоящим повтором, а не «уже выполнено, вот вам пустота»:</p>
+<pre><code class="language-python">if response.status_code &gt;= 500:
+    # Сервер упал — работа, скорее всего, не сделана. Ключ убираем,
+    # чтобы повтор был настоящим повтором, а не «уже выполнено».
+    await session.delete(row)
+</code></pre>
+<p>«Скорее всего» здесь честное слово. Строго говоря, 500 мог случиться после того, как задача создалась. Стопроцентной гарантии без распределённых транзакций не бывает; выбор между «иногда дубль после падения сервера» и «иногда молча потерянное действие» я сделал в пользу первого.</p>
+<p>Ещё один случай: тот же ключ пришёл на другую ручку. Это не повтор, это ошибка клиента — отвечаю <code>422</code>, чтобы она не превратилась в загадочный баг через полгода.</p>
+<p>Живут ключи сутки. Клиент повторяет неотправленное минуты, в плохом случае — часы; через сутки ключ уже никому не нужен, а таблица растёт с каждым действием в приложении. Уборка — одна строка в том же месте, где чистится остальное:</p>
+<pre><code class="language-sql">DELETE FROM idempotency_keys WHERE created_at &lt; now() - interval '1 day'
+</code></pre>
+<h3>Грабли: middleware, который не видит сессию</h3>
+<p>Реализовать это зависимостью FastAPI не получится: зависимость видит запрос до обработчика и не может подменить результат. А нам нужен готовый ответ, чтобы сохранить его для повторов. Значит, middleware.</p>
+<p>И вот тут я потерял полчаса. Регистрируешь middleware как обычно — и <code>request.session</code> внутри падает с <code>AssertionError</code>.</p>
+<p>Дело в порядке. Starlette вставляет каждый следующий middleware <strong>снаружи</strong> предыдущего: добавленный позже оборачивает добавленных раньше. <code>SessionMiddleware</code> в моём <code>main.py</code> стоял первым, значит все мои <code>@app.middleware("http")</code> оказались снаружи — и работали до того, как сессия вообще появилась в запросе.</p>
+<p>Проверяется за минуту:</p>
+<pre><code class="language-python">app.add_middleware(SessionMiddleware, secret_key=&quot;x&quot;)
+
+@app.middleware(&quot;http&quot;)
+async def mw(request, call_next):
+    request.session   # AssertionError: SessionMiddleware must be installed
+    return await call_next(request)
+</code></pre>
+<p>Лечится переносом регистрации на строку выше <code>SessionMiddleware</code>. Я оставил в коде комментарий, потому что через месяц кто-нибудь (я) переставит строки местами и будет искать причину заново.</p>
+<h2>Шаг 3: очередь в браузере</h2>
+<p>Теперь сервер готов принимать повторы. Осталось, чтобы кто-то их делал.</p>
+<p>Этим занимается service worker: он видит все запросы страницы и может ответить на них сам. Логика на словах — «попробуй отправить, а если сеть отказала, положи в коробку и скажи странице, что мы запомнили»:</p>
+<pre><code class="language-js">e.respondWith(
+  fetch(req).catch(async () =&gt; {
+    const body = await copy.text();
+    await enqueue({ url: req.url, method: req.method, headers, body, at: Date.now() });
+    await tellPages({ type: 'outbox', pending: (await allQueued()).length });
+    if ('sync' in self.registration) {
+      try { await self.registration.sync.register(SYNC_TAG); } catch (err) {}
+    }
+    return new Response('', {
+      status: 202,
+      headers: { 'X-Doday-Queued': '1', 'HX-Reswap': 'none' },
+    });
+  })
+);
+</code></pre>
+<p>Несколько мест, где легко ошибиться.</p>
+<p><strong>Тело запроса читается один раз.</strong> <code>req.clone()</code> надо сделать до того, как запрос ушёл в <code>fetch</code>, иначе в обработчике ошибки читать будет уже нечего.</p>
+<p><strong>Хранить очередь надо в IndexedDB.</strong> Не потому что она лучше, а потому что <code>localStorage</code> синхронный и в service worker недоступен в принципе.</p>
+<p><strong>Порядок имеет значение.</strong> Если сеть отвалилась посреди отправки очереди — останавливаемся и ждём следующего раза, а не пытаемся отправить остальное:</p>
+<pre><code class="language-js">} catch (e) {
+  // Сеть снова пропала. Остальное ждёт следующего раза — порядок
+  // важен: «создать задачу» должно уйти раньше «отметить её».
+  break;
+}
+</code></pre>
+<p>То же самое при <code>409</code> (первый такой же запрос ещё выполняется) и при <code>5xx</code>. А вот <code>4xx</code> — это окончательный отказ: задачу, например, успели удалить с другого устройства. Такой запрос из очереди убираем, повторять его бессмысленно.</p>
+<p><strong>Background Sync есть не везде.</strong> Браузер умеет сам разбудить воркер, когда сеть вернётся, — но в Safari этого API нет до сих пор. Поэтому страница дополнительно слушает событие <code>online</code> и толкает воркер сама:</p>
+<pre><code class="language-js">window.addEventListener('online', function () {
+  navigator.serviceWorker.ready.then(function (r) {
+    r.active &amp;&amp; r.active.postMessage({ type: 'flush' });
+  });
+});
+</code></pre>
+<p><strong>Человеку надо сказать, что происходит.</strong> Молчаливая очередь ничем не лучше молчаливой потери: пользователь всё равно не знает, сохранилось или нет. У меня это полоска внизу экрана — «Одно изменение ждёт сети», — которая исчезает, когда очередь ушла.</p>
+<h3>Грабли: htmx и ответ, которого он не ждал</h3>
+<p>У меня интерфейс на htmx: кнопка шлёт POST и подставляет пришедший HTML на место строки задачи. Ответ «положили в очередь» никакого HTML не содержит — и первая же версия честно стёрла строку задачи с экрана. Человек нажал «готово», и задача исчезла вообще.</p>
+<p>Спасает заголовок <code>HX-Reswap: none</code> — им сервер (в нашем случае воркер) говорит htmx: ответ получен, подставлять ничего не надо. Строка остаётся на месте, а страница помечает её как неотправленную.</p>
+<h3>Грабли: воркер, который сломал мне CDN</h3>
+<p>Самое обидное я нашёл тестом. Первая версия обработчика <code>fetch</code> перехватывала <strong>все</strong> GET-запросы, включая <code>unpkg.com</code> и <code>cdn.tailwindcss.com</code>. Логика была «сходи в сеть, не вышло — отдай из кеша, не вышло — отдай 503».</p>
+<p>Работает, пока CDN отвечает. А прогонял я тест в окружении, где внешние адреса недоступны, — и случилось вот что: htmx не загрузился, потому что мой же воркер вернул на него <code>503</code>. Кнопки перестали быть кнопками. При этом собственный сайт открывался нормально — и со стороны это выглядело как «htmx сломался».</p>
+<p>Мораль простая: чужие домены не ваше дело.</p>
+<pre><code class="language-js">if (url.origin !== self.location.origin) return;
+</code></pre>
+<p>Одна строка, а без неё любой сбой у стороннего CDN превращается в отказ вашего приложения — причём в такой, который вы будете искать в своём коде.</p>
+<h2>Как это проверять</h2>
+<p>Тесты на сервер очевидны — берём один и тот же ключ и смотрим, сколько задач получилось:</p>
+<pre><code class="language-python">async def test_repeat_with_same_key_creates_one_task(logged_in_client, db_session):
+    payload = {&quot;text&quot;: &quot;Купить тетрадь&quot;}
+    headers = {&quot;Idempotency-Key&quot;: &quot;key-abc-123&quot;}
+
+    first = await logged_in_client.post(&quot;/htmx/quickadd&quot;, data=payload, headers=headers)
+    second = await logged_in_client.post(&quot;/htmx/quickadd&quot;, data=payload, headers=headers)
+
+    assert second.text == first.text                      # ответ тот же, а не новый
+    assert second.headers.get(&quot;Idempotency-Replayed&quot;) == &quot;1&quot;
+    assert await _task_count(db_session, &quot;Купить тетрадь&quot;) == 1
+</code></pre>
+<p>А вот очередь тестом на сервере не проверишь никак: она целиком живёт в браузере. Playwright умеет выключать сеть у контекста, и это ровно то, что нужно:</p>
+<pre><code class="language-js">await ctx.setOffline(true);
+await circle.click();                       // жмём «готово» без сети
+// значок появился, запрос лёг в IndexedDB
+await ctx.setOffline(false);
+await page.evaluate(() =&gt; window.dispatchEvent(new Event('online')));
+</code></pre>
+<p>Вывод такого прогона выглядит так:</p>
+<pre><code>воркер управляет страницей: true
+— сеть выключена —
+  [ответ] 202 /htmx/tasks/47583447-.../state
+значок очереди виден: true | Одно изменение ждёт сети
+в очереди: [&quot;POST /htmx/tasks/47583447-.../state&quot;]
+— сеть включена —
+осталось в очереди: 0
+</code></pre>
+<p>И финальная проверка — в базе, а не на экране:</p>
+<pre><code>        title         | is_completed
+----------------------+--------------
+ Физика: задачи 12–15 | t
+</code></pre>
+<p>Именно этот тест и нашёл историю с CDN. Пока я кликал руками в обычном браузере, всё работало.</p>
+<h2>Когда всё это не нужно</h2>
+<p>Не надо делать очередь, если действия пользователя — только чтение. Список, который не открылся, человек просто откроет ещё раз; хранить нечего.</p>
+<p>Не надо повторять то, что имеет смысл только сейчас. Вход, оплата, отправка кода из СМС — запрос, который доехал через сорок минут, скорее навредит. У меня такие пути прямо исключены из очереди:</p>
+<pre><code class="language-js">return !/^\/(auth|api\/billing|miniapp\/auth)/.test(url.pathname);
+</code></pre>
+<p>И это не полноценная офлайн-синхронизация. Тут нет разрешения конфликтов: если задачу поменяли на двух устройствах, победит тот, чей запрос дошёл позже. Для планировщика этого достаточно — а если вам нужно больше, вы уже смотрите в сторону CRDT, и это разговор другого масштаба и другой цены.</p>
+<p>Порядок, в котором я бы это делал заново:</p>
+<ol>
+<li>Убрать из API ручки вида «переключи». Бесплатно, полезно сразу, ничего не ломает.</li>
+<li>Добавить <code>Idempotency-Key</code> там, где создаются сущности. День работы, зато повторы становятся безопасными — и не только из очереди, но и от двойного клика.</li>
+<li>И только потом — очередь в браузере. Без первых двух пунктов она превращается в машину по производству дублей.</li>
+</ol>
+<p>Код проекта открыт: <a href="https://github.com/SwairIt/doday">github.com/SwairIt/doday</a> — там и middleware, и воркер целиком. Сам проект — <a href="https://getdoday.ru/">getdoday.ru</a>.</p>
+<p>Ярослав Боев.</p>
+</article>
+</details>
+
+<script>
+async function copyPost() {
+  const article = document.getElementById("article");
+  const html = article.innerHTML;
+  const text = article.innerText;
+  const btn = document.getElementById("copy-btn");
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        })
+      ]);
+    } else {
+      const range = document.createRange();
+      range.selectNode(article);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand("copy");
+      sel.removeAllRanges();
+    }
+    btn.textContent = "✓ Скопировано! Теперь вставь в редактор";
+    btn.classList.add("ok");
+    setTimeout(() => { btn.textContent = "📋 Скопировать пост"; btn.classList.remove("ok"); }, 3000);
+  } catch (e) {
+    alert("Не получилось скопировать автоматически. Выдели текст в белом блоке через Ctrl+A и скопируй Ctrl+C. Ошибка: " + e.message);
+  }
+}
+
+async function copySection(sectionId, btn) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  const html = el.innerHTML;
+  const text = el.innerText;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        })
+      ]);
+    } else {
+      const range = document.createRange();
+      range.selectNode(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand("copy");
+      sel.removeAllRanges();
+    }
+    const origText = btn.textContent;
+    btn.textContent = "✓ Готово";
+    btn.classList.add("ok");
+    setTimeout(() => { btn.textContent = origText; btn.classList.remove("ok"); }, 2500);
+  } catch (e) {
+    alert("Не получилось. Выдели текст руками через Ctrl+A в блоке выше. Ошибка: " + e.message);
+  }
+}
+
+async function copyPlainText() {
+  const ta = document.getElementById("plain-textarea");
+  ta.select();
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(ta.value);
+    } else {
+      document.execCommand("copy");
+    }
+    alert("Plain text скопирован в буфер. Вставь в редактор Хабр.");
+  } catch (e) {
+    alert("Не получилось. Ошибка: " + e.message);
+  }
+}
+</script>
+</body></html>

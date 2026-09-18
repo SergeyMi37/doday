@@ -54,7 +54,8 @@
           title="{% if task.is_completed %}Отменить{% else %}Завершить{% endif %}"
           class="shrink-0 mt-1.5 w-6 h-6 rounded-full border-2 transition flex items-center justify-center hover:scale-110 active:scale-95
                  {% if task.is_completed %}grad-bg border-transparent{% else %}border-{{ prio_class }}-400 hover:border-[var(--accent)]{% endif %}"
-          hx-post="/htmx/tasks/{{ task.id }}/toggle"
+          hx-post="/htmx/tasks/{{ task.id }}/state"
+          hx-vals='{"completed": "{{ "false" if task.is_completed else "true" }}"}'
           hx-target="#task-{{ task.id }}"
           hx-swap="outerHTML"
           hx-on::after-request="event.detail.successful && htmx.ajax('GET', '/htmx/tasks/{{ task.id }}/detail', {target: '#task-detail-slot', swap: 'innerHTML'})">
@@ -470,7 +471,8 @@
               <button type="button"
                       class="shrink-0 w-4 h-4 rounded-full border-2 transition flex items-center justify-center
                              {% if sub.is_completed %}grad-bg border-transparent{% else %}border-{{ sub_prio }}-400{% endif %}"
-                      hx-post="/htmx/tasks/{{ sub.id }}/toggle"
+                      hx-post="/htmx/tasks/{{ sub.id }}/state"
+                      hx-vals='{"completed": "{{ "false" if sub.is_completed else "true" }}"}'
                       hx-target="this"
                       hx-swap="none"
                       hx-on::after-request="event.detail.successful && htmx.ajax('GET', '/htmx/tasks/{{ task.id }}/detail', {target: '#task-detail-slot', swap: 'innerHTML'})">

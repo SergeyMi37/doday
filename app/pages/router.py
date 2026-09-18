@@ -116,6 +116,7 @@ async def marketing_preview_raw(slug: str) -> Response:
         "english-bots-ai-seo",
         "vc-bots-ai-seo",
         "habr-timezones",
+        "habr-offline-queue",
     }
     if slug not in allowed:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
@@ -124,6 +125,7 @@ async def marketing_preview_raw(slug: str) -> Response:
         "habr-bots-ai-seo": "docs/articles/2026-08-27-habr-bots-ai-seo.md",
         "habr-quickadd-dates": "docs/articles/2026-08-31-habr-quickadd-dates.md",
         "habr-timezones": "docs/articles/2026-09-17-habr-timezones.md",
+        "habr-offline-queue": "docs/articles/2026-09-18-habr-offline-queue.md",
         "english-bots-ai-seo": "docs/articles/2026-08-27-english-bots-ai-seo.md",
         "vc-bots-ai-seo": "docs/articles/2026-08-29-vc-bots-ai-seo.md",
     }
@@ -169,6 +171,7 @@ async def marketing_preview(slug: str) -> HTMLResponse:
         "english-bots-ai-seo",
         "vc-bots-ai-seo",
         "habr-timezones",
+        "habr-offline-queue",
     }
     if slug not in allowed:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "preview not found")

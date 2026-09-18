@@ -24,9 +24,10 @@ from app.ai import models as _ai_models  # noqa: F401
 from app.auth import models as _auth_models  # noqa: F401  register tables with Base.metadata
 from app.billing import models as _billing_models  # noqa: F401
 from app.config import get_settings
-from app.db import Base, get_session
+from app.db import Base, get_engine, get_session
 from app.gamification import models as _gamification_models  # noqa: F401
 from app.habits import models as _habits_models  # noqa: F401
+from app.idempotency import models as _idempotency_models  # noqa: F401
 from app.labels import models as _labels_models  # noqa: F401
 from app.links import models as _links_models  # noqa: F401
 from app.main import app
@@ -70,6 +71,12 @@ async def _setup_test_schema() -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def _init_test_db() -> None:
+    # Часть кода ходит в базу мимо зависимости get_session — например,
+    # middleware идемпотентности, которому нужна своя транзакция, чтобы взять
+    # замок до обработчика. Такой код берёт адрес базы из настроек, поэтому в
+    # тестах приложение целиком переводим на тестовую базу, а не только
+    # подменяем зависимость.
+    _settings.database_url = _settings.test_database_url
     asyncio.run(_setup_test_schema())
 
 
@@ -77,6 +84,19 @@ async def _truncate_all(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
         table_names = ", ".join(f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables))
         await conn.execute(text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(autouse=True)
+async def _reset_app_engine() -> AsyncIterator[None]:
+    """Закрыть соединения приложения после каждого теста.
+
+    Движок в app.db закеширован на весь процесс, а pytest-asyncio даёт
+    каждому тесту свой event loop. Соединения, открытые в прошлом цикле, в
+    новом уже нерабочие — их надо отпустить, иначе первый же поход в базу
+    мимо тестовой сессии (например, из middleware) падает на мёртвом сокете.
+    """
+    yield
+    await get_engine().dispose()
 
 
 @pytest.fixture(autouse=True)
