@@ -1,9 +1,10 @@
 # Кнопка нажата, а ответа нет: как не потерять действие пользователя и не наделать дублей
 
 > Черновик статьи для Хабра.
-> Хабы: JavaScript, Python, Разработка веб-сайтов, FastAPI, PostgreSQL.
-> Теги: service worker, offline, idempotency, IndexedDB, htmx, FastAPI.
-> Сложность: средний.
+> Целевая аудитория: Разработка и инженерия.
+> Хабы: Веб-разработка, JavaScript, Python, Проектирование API, PostgreSQL.
+> Ключевые слова: офлайн-очередь, Service Worker, идемпотентность, IndexedDB, Background Sync, повторные запросы, FastAPI, PostgreSQL, htmx, Playwright.
+> Формат: кейс. Сложность: средний.
 > Автор: SwairIt.
 
 ---
