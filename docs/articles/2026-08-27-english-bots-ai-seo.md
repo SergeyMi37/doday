@@ -517,4 +517,4 @@ The product itself: **getdoday.ru**. My other projects: **all.getdoday.ru**
 
 Thanks for reading.
 
-*Yaroslav Boev*
+*SwairIt*

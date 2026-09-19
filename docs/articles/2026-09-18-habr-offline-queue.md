@@ -4,7 +4,7 @@
 > Хабы: JavaScript, Python, Разработка веб-сайтов, FastAPI, PostgreSQL.
 > Теги: service worker, offline, idempotency, IndexedDB, htmx, FastAPI.
 > Сложность: средний.
-> Автор: Ярослав Боев (SwairIt).
+> Автор: SwairIt.
 
 ---
 
@@ -280,4 +280,4 @@ return !/^\/(auth|api\/billing|miniapp\/auth)/.test(url.pathname);
 
 Код проекта открыт: [github.com/SwairIt/doday](https://github.com/SwairIt/doday) — там и middleware, и воркер целиком. Сам проект — [getdoday.ru](https://getdoday.ru/).
 
-Ярослав Боев.
+SwairIt

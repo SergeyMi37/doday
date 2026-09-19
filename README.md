@@ -27,7 +27,7 @@
 
 Если коротко: это **ежедневник, список дел и трекер домашки в одном месте** — в браузере, в Telegram и на телефоне как приложение.
 
-Автор — [Ярослав Боев](https://github.com/SwairIt) (SwairIt).
+Автор — [SwairIt](https://github.com/SwairIt).
 
 ### Кому пригодится
 
@@ -278,7 +278,7 @@ Web · Telegram Mini App · bot — all on one backend.
 
 **Doday** is a free task manager and todo list built for students. Homework is pulled from the electronic school diary, the lesson schedule sits next to the tasks, reminders arrive in Telegram, and nothing gets forgotten because there's a single list that's always at hand.
 
-Built solo by [Yaroslav Boev](https://github.com/SwairIt) (SwairIt) since May 2026.
+Built solo by [SwairIt](https://github.com/SwairIt) since May 2026.
 
 **Live:** [getdoday.ru](https://getdoday.ru) · **All projects:** [all.getdoday.ru](https://all.getdoday.ru)
 
@@ -344,7 +344,7 @@ uv run python -m uvicorn app.main:app --reload
 
 ## Автор и лицензия
 
-**Ярослав Боев** ([@SwairIt](https://github.com/SwairIt)) — разработка, дизайн, инфраструктура и тексты.
+**[@SwairIt](https://github.com/SwairIt)** — разработка, дизайн, инфраструктура и тексты.
 Написано на Python в паре с терминальным ИИ-агентом; архитектурные решения, ревью и ответственность — авторские.
 
 Сайт: [getdoday.ru](https://getdoday.ru) · Все проекты: [all.getdoday.ru](https://all.getdoday.ru) · Почта: doday.support@gmail.com
