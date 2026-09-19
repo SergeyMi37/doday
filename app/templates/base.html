@@ -202,6 +202,16 @@
     </script>
 
     <style>
+      /* Атрибут hidden должен скрывать. Звучит странно, но без !important он
+         этого не делает: правило [hidden]{display:none} живёт в таблице
+         браузера, а любой класс Tailwind с display (flex, grid, block) — в
+         авторской, и авторская выигрывает. Элемент с hidden и class="flex"
+         спокойно показывается. Поймали на значке «ждёт сети»: он висел у
+         всех и всегда. */
+      [hidden] {
+        display: none !important;
+      }
+
       :root {
         --bg: #fafaff;
         --surface: #ffffff;
